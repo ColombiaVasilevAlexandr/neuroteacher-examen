@@ -60,6 +60,7 @@ def initialize():
         CREATE TABLE IF NOT EXISTS material_chapters (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, title TEXT NOT NULL, page_number INTEGER NOT NULL, FOREIGN KEY(source_id) REFERENCES sources(id));
         CREATE TABLE IF NOT EXISTS exam_sessions (id INTEGER PRIMARY KEY, total_questions INTEGER NOT NULL, correct_answers INTEGER NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS bookmarks (question_id INTEGER PRIMARY KEY, created_at TEXT DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(question_id) REFERENCES questions(id));
+        CREATE TABLE IF NOT EXISTS review_queue (question_id INTEGER PRIMARY KEY, due_at TEXT NOT NULL, step INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(question_id) REFERENCES questions(id));
         ''')
         try:
             db.execute("ALTER TABLE attempts ADD COLUMN response_time_seconds REAL")
@@ -153,6 +154,14 @@ def answer(question_id: int, payload: Answer):
         if not q: raise HTTPException(404, "Question not found")
         correct = payload.answer.upper() == q['correct_answer']
         db.execute("INSERT INTO attempts(question_id,answer,correct,response_time_seconds) VALUES(?,?,?,?)", (question_id, payload.answer.upper(), correct, payload.response_time_seconds))
+        existing = db.execute("SELECT step FROM review_queue WHERE question_id=?", (question_id,)).fetchone()
+        if correct:
+            step = min((existing['step'] if existing else -1) + 1, 4)
+            days = (1, 3, 7, 14, 30)[step]
+        else:
+            step, days = 0, 1
+        due = (date.today() + timedelta(days=days)).isoformat()
+        db.execute("INSERT INTO review_queue(question_id,due_at,step) VALUES(?,?,?) ON CONFLICT(question_id) DO UPDATE SET due_at=excluded.due_at, step=excluded.step", (question_id, due, step))
     return {"correct": correct, "correct_answer": q['correct_answer'], "explanation_es": q['explanation_es'], "explanation_ru": q['explanation_ru']}
 
 @app.post('/api/exams/complete')
@@ -287,12 +296,25 @@ def bookmarks():
         ''').fetchall()
     return [dict(row) for row in rows]
 
+@app.get('/api/review/due')
+def due_reviews(limit: int = 20):
+    with conn() as db:
+        rows = db.execute('''
+            SELECT q.id,q.question_es,q.question_ru,q.answer_a,q.answer_a_ru,q.answer_b,q.answer_b_ru,
+                   q.answer_c,q.answer_c_ru,q.answer_d,q.answer_d_ru,q.topic,q.source_page,r.due_at
+            FROM review_queue r JOIN questions q ON q.id=r.question_id
+            WHERE date(r.due_at) <= date('now','localtime')
+            ORDER BY r.due_at, q.id LIMIT ?
+        ''', (min(max(limit, 1), 50),)).fetchall()
+    return [dict(row) for row in rows]
+
 @app.post('/api/bookmarks/{question_id}')
 def add_bookmark(question_id: int):
     with conn() as db:
         exists = db.execute("SELECT 1 FROM questions WHERE id=?", (question_id,)).fetchone()
         if not exists: raise HTTPException(404, "Question not found")
         db.execute("INSERT OR IGNORE INTO bookmarks(question_id) VALUES(?)", (question_id,))
+        db.execute("INSERT OR IGNORE INTO review_queue(question_id,due_at,step) VALUES(?,date('now','localtime'),0)", (question_id,))
     return {"saved": True}
 
 @app.delete('/api/bookmarks/{question_id}')
