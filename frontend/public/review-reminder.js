@@ -1,0 +1,13 @@
+(() => {
+  const add = count => {
+    const card = document.querySelector('.today')
+    if (!card || card.querySelector('.review-reminder') || !count) return
+    const reminder = document.createElement('div'); reminder.className='review-reminder'
+    reminder.innerHTML=`<div><b>Повторение ждёт</b><span>${count} ${count === 1 ? 'вопрос' : 'вопросов'} по расписанию</span></div><button>Повторить</button>`
+    reminder.querySelector('button').onclick=()=>[...document.querySelectorAll('.nav')].find(button=>/Повторение|Repaso/.test(button.textContent))?.click()
+    card.querySelector('.start')?.insertAdjacentElement('beforebegin',reminder)
+  }
+  fetch('http://127.0.0.1:8000/api/dashboard').then(r=>r.ok?r.json():Promise.reject()).then(data=>{
+    add(data.due_reviews || 0); new MutationObserver(()=>add(data.due_reviews || 0)).observe(document.documentElement,{childList:true,subtree:true})
+  }).catch(()=>undefined)
+})()
