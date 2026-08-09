@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.venv/
+backend/.venv/
+__pycache__/
+*.pyc
+backend/api.log
+backend/check.json
+backend/page4.json
+database/*.before_bank_cleanup.db
+data/imports/
+data/official_sources/*.pdf
+
+# Environment files
+.env
+.env.*
+
+# Build output
+dist/
+build/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.vscode/
