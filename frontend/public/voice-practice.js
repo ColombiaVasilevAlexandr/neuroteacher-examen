@@ -12,8 +12,8 @@
   }
   const apply = () => {
     const buttons = [...document.querySelectorAll('.quick > div > button')]
-    const listen = buttons.find(button => button.textContent.includes('Прослушать вопрос'))
-    const reply = buttons.find(button => button.textContent.includes('Ответить голосом'))
+    const listen = buttons.find(button => /Прослушать вопрос|Escuchar pregunta/.test(button.textContent))
+    const reply = buttons.find(button => /Ответить голосом|Responder por voz/.test(button.textContent))
     if (!listen || !reply || document.querySelector('.voice-practice-launch')) return
     listen.style.display = 'none'; reply.style.display = 'none'
     const combined = document.createElement('button')
@@ -22,5 +22,5 @@
     combined.onclick = () => open(listen, reply)
     listen.parentElement.prepend(combined)
   }
-  apply(); new MutationObserver(apply).observe(document.documentElement,{childList:true,subtree:true})
+  apply(); new MutationObserver(apply).observe(document.documentElement,{childList:true,subtree:true}); setInterval(apply, 800)
 })()
