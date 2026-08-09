@@ -15,6 +15,7 @@
         session.querySelectorAll('[data-answer]').forEach(button => button.onclick = async () => {
           const response = await fetch(`${API}/questions/${q.id}/answer`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answer:button.dataset.answer})})
           const result = await response.json(); const note = session.querySelector('.review-result')
+          window.dispatchEvent(new Event('reviews:updated'))
           session.querySelectorAll('[data-answer]').forEach(item => item.disabled = true)
           note.textContent = result.correct ? `Верно. ${result.explanation_ru || result.explanation_es}` : `Неверно. ${result.explanation_ru || result.explanation_es}`
           note.className = `review-result ${result.correct ? 'right' : 'wrong'}`
