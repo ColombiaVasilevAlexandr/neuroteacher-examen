@@ -196,6 +196,7 @@ def ai_status():
 def ai_chat(payload: ChatRequest):
     provider = os.getenv("AI_PROVIDER", "openai").lower()
     system = """Eres un profesor para el examen de nacionalidad colombiana. Habla principalmente en español claro, nivel A2-B1. Si el estudiante escribe en ruso, añade una explicación breve en ruso. Corrige errores con tacto. Haz una sola pregunta cada vez. No inventes datos oficiales; indica cuando algo requiere verificar la guía Colombia, nuestra casa."""
+    system += " Always add a concise Russian translation after every Spanish explanation, question, or correction. Use clear plain text without Markdown or emoji."
     history = [{"role": item.role, "content": item.content} for item in payload.history[-10:]]
     def post_json(url: str, key: str, body: dict):
         req = urlrequest.Request(url, data=json.dumps(body).encode("utf-8"), headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}, method="POST")
