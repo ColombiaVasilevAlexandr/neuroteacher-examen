@@ -115,6 +115,7 @@ class ChatRequest(BaseModel):
 class SpeechRequest(BaseModel):
     text: str
     rate: str = "+0%"
+    locale: str | None = None
 
 @app.get('/api/health')
 def health(): return {"status": "ok"}
@@ -125,6 +126,10 @@ async def consultant_speech(payload: SpeechRequest):
     if not text:
         raise HTTPException(400, "Text is required")
     voice = "ru-RU-DmitryNeural" if re.search(r"[А-Яа-яЁё]", text) else "es-CO-GonzaloNeural"
+    if payload.locale == "es-CO":
+        voice = "es-CO-GonzaloNeural"
+    elif payload.locale == "ru-RU":
+        voice = "ru-RU-DmitryNeural"
     try:
         audio = bytearray()
         communicate = edge_tts.Communicate(text, voice=voice, rate=payload.rate)
