@@ -215,11 +215,10 @@ def dashboard():
         topic_counts = [dict(row) for row in db.execute("SELECT topic, COUNT(*) AS count FROM questions WHERE status IN ('reviewed','verified') GROUP BY topic ORDER BY count DESC").fetchall()]
         trend = []
         today = date.today()
-        for weeks_ago in range(4, -1, -1):
-            end = today - timedelta(days=weeks_ago * 7)
-            start = end - timedelta(days=6)
-            row = db.execute("SELECT COUNT(*), COALESCE(SUM(correct),0) FROM attempts WHERE date(created_at,'localtime') BETWEEN ? AND ?", (start.isoformat(), end.isoformat())).fetchone()
-            trend.append({"date": end.isoformat(), "score": round(row[1] / row[0] * 100) if row[0] else None, "attempts": row[0]})
+        for days_ago in range(4, -1, -1):
+            day = today - timedelta(days=days_ago)
+            row = db.execute("SELECT COUNT(*), COALESCE(SUM(correct),0) FROM attempts WHERE date(created_at,'localtime') = ?", (day.isoformat(),)).fetchone()
+            trend.append({"date": day.isoformat(), "score": round(row[1] / row[0] * 100) if row[0] else None, "attempts": row[0]})
     streak = 0
     cursor = date.today()
     while cursor in active_days:
