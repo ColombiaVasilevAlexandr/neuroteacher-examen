@@ -226,6 +226,7 @@ def dashboard():
         correct = db.execute("SELECT COUNT(*) FROM attempts WHERE correct=1").fetchone()[0]
         average_time = db.execute("SELECT AVG(response_time_seconds) FROM attempts WHERE response_time_seconds IS NOT NULL").fetchone()[0]
         exams = db.execute("SELECT COUNT(*) FROM exam_sessions").fetchone()[0]
+        due_reviews = db.execute("SELECT COUNT(*) FROM review_queue WHERE date(due_at) <= date('now','localtime')").fetchone()[0]
         active_days = {date.fromisoformat(row[0]) for row in db.execute("SELECT DISTINCT date(created_at, 'localtime') FROM attempts")}
         recent = [dict(row) for row in db.execute('''
             SELECT q.question_es, q.topic, a.correct, a.created_at
@@ -249,7 +250,7 @@ def dashboard():
         "score": round(correct / total * 100) if total else 0,
         "streak": streak, "exams": exams, "average_time_seconds": round(average_time, 1) if average_time is not None else None,
         "recent_activity": recent, "trend": trend,
-        "topic_counts": topic_counts,
+        "topic_counts": topic_counts, "due_reviews": due_reviews,
     }
 
 @app.get('/api/materials/chapters')
