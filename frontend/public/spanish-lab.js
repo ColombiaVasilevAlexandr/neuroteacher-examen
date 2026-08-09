@@ -1,78 +1,18 @@
 (() => {
   const API = 'http://127.0.0.1:8000/api'
-  const drills = [
-    { title: 'Presente: yo', hint: 'Yo ___ en Colombia.', answer: 'vivo', note: 'С yo глагол vivir: vivo.' },
-    { title: 'Presente: nosotros', hint: 'Nosotros ___ español.', answer: 'hablamos', note: 'С nosotros окончание -amos.' },
-    { title: 'Вежливое обращение', hint: '¿Cómo ___ usted?', answer: 'esta', note: 'Фраза: ¿Cómo está usted?' },
-  ]
-  const words = [
-    ['ciudad', 'город'], ['documento', 'документ'], ['derecho', 'право'],
-    ['historia', 'история'], ['pregunta', 'вопрос'], ['respuesta', 'ответ'],
-  ]
-
+  const drills = [['Yo ___ en Colombia.','vivo','С yo: vivo.'],['Nosotros ___ español.','hablamos','С nosotros: hablamos.'],['¿Cómo ___ usted?','está','Вежливо: ¿Cómo está usted?'],['Colombia ___ un país.','es','Постоянный признак: es.'],['Bogotá es una ___.','ciudad','Ciudad — город.'],['Colombia ___ dos océanos.','tiene','Tener: tiene.'],['___ capital de Colombia es Bogotá.','La','Capital — слово женского рода.'],['Los ___ son importantes.','documentos','Documento → documentos.']]
+  const words = [['ciudad','город'],['documento','документ'],['derecho','право'],['pregunta','вопрос'],['respuesta','ответ'],['aprender','учиться'],['vivir','жить'],['hablar','говорить'],['historia','история']]
+  const clean = text => text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()
   const open = () => {
     if (document.querySelector('.spanish-lab')) return
-    const modal = document.createElement('section')
-    modal.className = 'spanish-lab'
-    modal.innerHTML = `<div class="spanish-lab__window">
-      <header><div><small>CASTELLANO · A2–B1</small><h1>Практика испанского</h1><p>Грамматика, слова и экзаменационные вопросы.</p></div><button class="spanish-lab__close" aria-label="Закрыть">×</button></header>
-      <nav><button class="active" data-tab="grammar">Грамматика</button><button data-tab="words">Словарь</button><button data-tab="test">Тест</button></nav>
-      <main class="spanish-lab__content"></main>
-    </div>`
-    document.body.append(modal)
-    const content = modal.querySelector('.spanish-lab__content')
-    const showGrammar = () => {
-      const drill = drills[Math.floor(Math.random() * drills.length)]
-      content.innerHTML = `<article class="spanish-card"><span>Короткое упражнение</span><h2>${drill.title}</h2><p class="spanish-sentence">${drill.hint.replace('___', '<input autocomplete="off" aria-label="Ответ">')}</p><button class="spanish-primary">Проверить</button><p class="spanish-feedback"></p></article><aside class="spanish-tip"><b>Подсказка</b><p>Читайте фразу вслух, затем впишите только недостающее слово.</p></aside>`
-      content.querySelector('.spanish-primary').onclick = () => {
-        const value = content.querySelector('input').value.trim().toLocaleLowerCase()
-        const feedback = content.querySelector('.spanish-feedback')
-        const right = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === drill.answer
-        feedback.textContent = right ? `Верно. ${drill.note}` : `Правильный вариант: ${drill.answer}. ${drill.note}`
-        feedback.className = `spanish-feedback ${right ? 'right' : 'wrong'}`
-      }
-    }
-    const showWords = () => {
-      content.innerHTML = `<p class="spanish-intro">Нажмите на карточку, чтобы увидеть перевод. Повторяйте слова вслух.</p><div class="spanish-words">${words.map(([es, ru]) => `<button data-ru="${ru}"><b>${es}</b><span>нажмите, чтобы перевести</span></button>`).join('')}</div>`
-      content.querySelectorAll('.spanish-words button').forEach(button => button.onclick = () => {
-        const open = button.classList.toggle('revealed')
-        button.querySelector('span').textContent = open ? button.dataset.ru : 'нажмите, чтобы перевести'
-      })
-    }
-    const showTest = async () => {
-      content.innerHTML = '<p class="spanish-loading">Подбираю вопрос по Castellano…</p>'
-      try {
-        const items = await fetch(`${API}/questions?topic=Castellano&limit=1`).then(r => r.json())
-        const q = items[0]
-        if (!q) throw new Error()
-        const choices = ['A', 'B', 'C', 'D'].map(key => `<button data-answer="${key}"><b>${key}</b>${q[`answer_${key.toLowerCase()}`]}</button>`).join('')
-        content.innerHTML = `<article class="spanish-card"><span>Экзаменационный вопрос</span><h2>${q.question_es}</h2><div class="spanish-options">${choices}</div><p class="spanish-feedback"></p></article>`
-        content.querySelectorAll('[data-answer]').forEach(button => button.onclick = async () => {
-          const result = await fetch(`${API}/questions/${q.id}/answer`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({answer: button.dataset.answer}) }).then(r => r.json())
-          content.querySelectorAll('[data-answer]').forEach(item => item.disabled = true)
-          const feedback = content.querySelector('.spanish-feedback')
-          feedback.textContent = result.correct ? `Верно. ${result.explanation_es}` : `Неверно. ${result.explanation_es}`
-          feedback.className = `spanish-feedback ${result.correct ? 'right' : 'wrong'}`
-        })
-      } catch { content.innerHTML = '<p class="spanish-feedback wrong">Не удалось загрузить вопрос. Проверьте, что API запущен.</p>' }
-    }
-    const render = tab => ({ grammar: showGrammar, words: showWords, test: showTest }[tab])()
-    modal.querySelector('.spanish-lab__close').onclick = () => modal.remove()
-    modal.addEventListener('click', event => { if (event.target === modal) modal.remove() })
-    modal.querySelectorAll('nav button').forEach(button => button.onclick = () => {
-      modal.querySelectorAll('nav button').forEach(item => item.classList.toggle('active', item === button)); render(button.dataset.tab)
-    })
-    render('grammar')
+    const modal=document.createElement('section'); modal.className='spanish-lab'
+    modal.innerHTML='<div class="spanish-lab__window"><header><div><small>CASTELLANO · A2–B1</small><h1>Практика испанского</h1><p>Грамматика, слова, диалоги и вопросы экзамена.</p></div><button class="spanish-lab__close">×</button></header><nav><button class="active" data-tab="grammar">Грамматика</button><button data-tab="words">Словарь</button><button data-tab="dialogues">Диалоги</button><button data-tab="test">Тест</button></nav><main class="spanish-lab__content"></main></div>'
+    document.body.append(modal); const area=modal.querySelector('main')
+    const grammar=()=>{const d=drills[Math.floor(Math.random()*drills.length)];area.innerHTML=`<article class="spanish-card"><span>УПРАЖНЕНИЕ</span><h2>Вставьте слово</h2><p class="spanish-sentence">${d[0].replace('___','<input autocomplete="off">')}</p><button class="spanish-primary">Проверить</button><p class="spanish-feedback"></p></article>`;area.querySelector('.spanish-primary').onclick=()=>{const yes=clean(area.querySelector('input').value)===clean(d[1]),f=area.querySelector('.spanish-feedback');f.textContent=yes?`Верно. ${d[2]}`:`Ответ: ${d[1]}. ${d[2]}`;f.className=`spanish-feedback ${yes?'right':'wrong'}`}}
+    const vocabulary=()=>{const known=new Set(JSON.parse(localStorage.getItem('spanishWordsKnown')||'[]'));area.innerHTML=`<p class="spanish-intro">Первое нажатие — перевод, второе — отметить слово как запомненное.</p><div class="spanish-words">${words.map(w=>`<button data-es="${w[0]}" data-ru="${w[1]}"><b>${w[0]}</b><span>${known.has(w[0])?'запомнено ✓':'нажмите для перевода'}</span></button>`).join('')}</div>`;area.querySelectorAll('.spanish-words button').forEach(b=>b.onclick=()=>{if(!b.classList.contains('revealed')){b.classList.add('revealed');b.querySelector('span').textContent=b.dataset.ru;return}known.add(b.dataset.es);localStorage.setItem('spanishWordsKnown',JSON.stringify([...known]));b.querySelector('span').textContent='запомнено ✓'})}
+    const dialogues=()=>{const d=[['Знакомство','Mucho gusto, me llamo Aleksandr.<br>¿De dónde es usted?<br>Soy de Rusia y vivo en Colombia.','Очень приятно, меня зовут Александр. — Откуда вы? — Я из России и живу в Колумбии.'],['В учреждении','Buenos días. Quiero información sobre mi trámite.<br>Claro, presente su documento, por favor.','Добрый день. Я хочу информацию по заявлению. — Конечно, предъявите документ.'],['Экзамен','¿Cuál es la capital de Colombia?<br>La capital de Colombia es Bogotá.','Какова столица Колумбии? — Столица Колумбии — Богота.']];area.innerHTML=`<p class="spanish-intro">Читайте реплики вслух, затем откройте перевод.</p><div class="spanish-dialogues">${d.map(x=>`<article><b>${x[0]}</b><p>${x[1]}</p><button data-ru="${x[2]}">Показать перевод</button><small></small></article>`).join('')}</div>`;area.querySelectorAll('.spanish-dialogues button').forEach(b=>b.onclick=()=>{b.nextElementSibling.textContent=b.dataset.ru;b.textContent='Перевод показан'})}
+    const test=async()=>{area.innerHTML='<p>Подбираю вопрос…</p>';try{const q=(await fetch(`${API}/questions?topic=Castellano&limit=1`).then(r=>r.json()))[0];area.innerHTML=`<article class="spanish-card"><span>ВОПРОС ЭКЗАМЕНА</span><h2>${q.question_es}</h2><div class="spanish-options">${['A','B','C','D'].map(k=>`<button data-a="${k}"><b>${k}</b>${q[`answer_${k.toLowerCase()}`]}</button>`).join('')}</div><p class="spanish-feedback"></p></article>`;area.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const r=await fetch(`${API}/questions/${q.id}/answer`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answer:b.dataset.a})}).then(x=>x.json()),f=area.querySelector('.spanish-feedback');area.querySelectorAll('[data-a]').forEach(x=>x.disabled=true);f.textContent=(r.correct?'Верно. ':'Неверно. ')+r.explanation_es;f.className=`spanish-feedback ${r.correct?'right':'wrong'}`})}catch{area.innerHTML='<p class="spanish-feedback wrong">Нет связи с API.</p>'}}
+    const show=tab=>({grammar,vocabulary,dialogues,test}[tab])();modal.querySelector('.spanish-lab__close').onclick=()=>modal.remove();modal.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{modal.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));show(b.dataset.tab)});show('grammar')
   }
-  const addButton = () => {
-    const tools = document.querySelector('.quick > div')
-    if (!tools || tools.querySelector('.spanish-lab-launch')) return
-    const button = document.createElement('button')
-    button.className = 'spanish-lab-launch'
-    button.innerHTML = '<i>ES</i><span>Практика<br>испанского</span>'
-    button.onclick = open
-    tools.append(button)
-  }
-  addButton()
-  new MutationObserver(addButton).observe(document.documentElement, {childList:true, subtree:true})
+  const add=()=>{const host=document.querySelector('.quick > div');if(!host||host.querySelector('.spanish-lab-launch'))return;const b=document.createElement('button');b.className='spanish-lab-launch';b.innerHTML='<i>ES</i><span>Практика<br>испанского</span>';b.onclick=open;host.append(b)};add();new MutationObserver(add).observe(document.documentElement,{childList:true,subtree:true})
 })()
