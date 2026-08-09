@@ -71,6 +71,17 @@ def initialize():
                 db.execute(f"ALTER TABLE questions ADD COLUMN {column} TEXT")
             except sqlite3.OperationalError:
                 pass
+        # Bring existing learning history into the review system once, without
+        # overwriting dates that have already been scheduled by newer attempts.
+        db.execute("""
+            INSERT OR IGNORE INTO review_queue(question_id,due_at,step)
+            SELECT question_id, date('now','localtime'), 0
+            FROM attempts WHERE correct=0 GROUP BY question_id
+        """)
+        db.execute("""
+            INSERT OR IGNORE INTO review_queue(question_id,due_at,step)
+            SELECT question_id, date('now','localtime'), 0 FROM bookmarks
+        """)
         db.execute("INSERT OR IGNORE INTO sources(id,title,url,document_type) VALUES(1,?,?,?)", ("Colombia, nuestra casa", SOURCE_URL, "official_study_guide"))
         if db.execute("SELECT COUNT(*) FROM questions").fetchone()[0] == 0:
             db.executemany("INSERT INTO questions(question_es,answer_a,answer_b,answer_c,answer_d,correct_answer,topic,explanation_es,status,source_id) VALUES(?,?,?,?,?,?,?,?,?,1)", [(*q, "reviewed") for q in QUESTIONS])
