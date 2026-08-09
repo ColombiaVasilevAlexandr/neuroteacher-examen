@@ -6,7 +6,8 @@
   const clean = value => value.replace(/\*{1,3}|#{1,6}|`|_/g,'').replace(/\[(.*?)\]\([^)]*\)/g,'$1').replace(/\s{2,}/g,' ').trim()
   const spanishPart = value => {
     const paragraphs = value.split(/\n\s*\n/).map(clean).filter(Boolean)
-    return paragraphs.find(part => !/[А-Яа-яЁё]/.test(part) && /[¿¡áéíóúüñ]|\b(colombia|cartagena|bogotá|qué|de|el|la|fue)\b/i.test(part)) || clean(value)
+    const spanish = paragraphs.filter(part => !/[А-Яа-яЁё]/.test(part) && /[¿¡áéíóúüñ]|\b(colombia|cartagena|bogotá|qué|de|el|la|fue|ahora|pregunta)\b/i.test(part))
+    return spanish.length ? spanish.join(' ') : clean(value)
   }
   synthesis.cancel = () => { nativeCancel(); if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); audio=null } }
   synthesis.speak = utterance => {
