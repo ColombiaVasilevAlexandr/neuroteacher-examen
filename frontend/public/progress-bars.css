@@ -1,5 +1,9 @@
-.preparation .chart{position:relative;overflow:hidden}.day-success-bars{position:absolute;z-index:0;inset:22px 10px 90px;display:flex;align-items:flex-end;justify-content:space-around;pointer-events:none}.day-success-bars span{position:relative;width:18%;height:var(--score);min-height:5px;border-radius:7px 7px 2px 2px;background:linear-gradient(180deg,#4ce7d655,#1b9f9a12);box-shadow:0 0 12px #38e0d033;transition:height .6s ease}.day-success-bars span::after{content:attr(data-score);position:absolute;top:4px;left:50%;transform:translateX(-50%);font:700 10px/1 system-ui;color:#e8fffc;text-shadow:0 0 7px #072b2a;opacity:.8}.preparation .chart-labels{position:relative;z-index:4}
-
-/* Keep the chart high inside its card; never let the graph disappear below it. */
-.preparation .chart{top:24px!important;bottom:28px!important}
+.preparation .chart{top:24px!important;bottom:28px!important;overflow:hidden}
+.daily-score-chart{position:absolute;inset:0;z-index:4}
+.daily-score-chart svg{width:100%;height:calc(100% - 30px);display:block}
+.daily-baseline{stroke:#38e0d055;stroke-width:2}.daily-target{stroke:#ffd12a55;stroke-width:2;stroke-dasharray:8 9}
+.daily-line{fill:none;stroke:#ffd12a;stroke-width:8;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 7px #ffd12aaa)}
+.daily-point circle{fill:#fff3a6;stroke:#ffd12a;stroke-width:6;filter:drop-shadow(0 0 8px #ffd12a)}
+.daily-point text{fill:#fff3a6;font:700 28px system-ui;text-anchor:middle}.daily-empty{fill:#38e0d055;stroke:#38e0d0;stroke-width:2}
+.daily-labels{color:#bfcbd3;justify-content:space-between;padding:0 3%;font:600 12px system-ui;display:flex}.daily-labels span{white-space:nowrap}
 @media(max-width:850px){.preparation .chart{top:132px!important;bottom:22px!important}}
