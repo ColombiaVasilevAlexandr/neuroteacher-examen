@@ -180,7 +180,7 @@ def ai_chat(payload: ChatRequest):
         if provider == "deepseek":
             key = os.getenv("DEEPSEEK_API_KEY")
             if not key: raise HTTPException(503, "DEEPSEEK_API_KEY is not configured")
-            data = post_json("https://api.deepseek.com/chat/completions", key, {"model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"), "messages": [{"role":"system","content":system}, *history, {"role":"user","content":payload.message}], "temperature":0.4, "max_tokens":600})
+            data = post_json("https://api.deepseek.com/chat/completions", key, {"model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"), "messages": [{"role":"system","content":system}, *history, {"role":"user","content":payload.message}], "temperature":0.35, "max_tokens":220})
             text = data["choices"][0]["message"]["content"]
         else:
             key = os.getenv("OPENAI_API_KEY")
@@ -188,7 +188,8 @@ def ai_chat(payload: ChatRequest):
             input_messages = [{"role":"developer","content":system}, *history, {"role":"user","content":payload.message}]
             data = post_json("https://api.openai.com/v1/responses", key, {"model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"), "input": input_messages, "max_output_tokens":600})
             text = "".join(part.get("text", "") for output in data.get("output", []) if output.get("type") == "message" for part in output.get("content", []) if part.get("type") == "output_text")
-        return {"provider": provider, "reply": text}
+        text = re.sub(r"(?m)^#{1,6}\s*", "", text).replace("**", "").replace("__", "").replace("`", "")
+        return {"provider": provider, "reply": text.strip()}
     except HTTPException:
         raise
     except HTTPError as exc:
