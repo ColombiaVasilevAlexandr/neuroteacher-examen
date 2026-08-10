@@ -22,5 +22,5 @@
     combined.onclick = () => open(listen, reply)
     listen.parentElement.prepend(combined)
   }
-  apply(); new MutationObserver(apply).observe(document.documentElement,{childList:true,subtree:true}); setInterval(apply, 800)
+  apply(); new MutationObserver(apply).observe(document.documentElement,{childList:true,subtree:true})
 })()
