@@ -1,0 +1,72 @@
+name: CosyVoice sample
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  synthesize:
+    if: github.event.issue.title == '[COSYVOICE-SAMPLE]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install client
+        run: pip install -q gradio_client
+      - name: Download neutral CosyVoice prompt
+        run: wget -q -O zero_shot_prompt.wav 'https://huggingface.co/spaces/FunAudioLLM/Fun-CosyVoice3-0.5B/resolve/main/zero_shot_prompt.wav'
+      - name: Generate Russian sample with CosyVoice3
+        run: |
+          mkdir -p out
+          python - <<'PY'
+          from gradio_client import Client, handle_file
+          import os, shutil
+
+          text = ('Колумбия расположена на северо-западе Южной Америки. '
+                  'Столица страны — Богота. Государство омывается водами Карибского моря и Тихого океана.')
+          instruct = ('You are a professional Russian audiobook narrator. Speak in standard Russian with calm, '
+                      'clear, natural diction, moderate pace, natural pauses, and a warm neutral male voice. '
+                      'Pronounce Spanish and Colombian names carefully.<|endofprompt|>')
+
+          client = Client('FunAudioLLM/Fun-CosyVoice3-0.5B', verbose=True)
+          api_name = None
+          for _, endpoint in client.endpoints.items():
+              name = getattr(endpoint, 'api_name', None)
+              print('endpoint:', name)
+              if name and 'generate_audio' in name:
+                  api_name = name if name.startswith('/') else '/' + name
+          if api_name is None:
+              api_name = '/generate_audio'
+          print('Using endpoint', api_name)
+          result = client.predict(
+              text,
+              'instruct',
+              '',
+              handle_file('zero_shot_prompt.wav'),
+              None,
+              instruct,
+              73521,
+              False,
+              'En',
+              api_name=api_name,
+          )
+          print('Result:', result)
+          src = result
+          if isinstance(result, (list, tuple)):
+              src = result[0]
+          if isinstance(src, dict):
+              src = src.get('path') or src.get('name')
+          if not src or not os.path.exists(src):
+              raise RuntimeError(f'CosyVoice did not return a local audio file: {result!r}')
+          shutil.copyfile(src, 'out/cosyvoice_ru_sample.wav')
+          PY
+      - name: Convert to MP3
+        run: ffmpeg -y -i out/cosyvoice_ru_sample.wav -c:a libmp3lame -b:a 128k out/cosyvoice_ru_sample.mp3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cosyvoice-ru-sample
+          path: out/cosyvoice_ru_sample.mp3
+          if-no-files-found: error
