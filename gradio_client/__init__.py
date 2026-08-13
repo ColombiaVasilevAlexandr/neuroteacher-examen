@@ -1,5 +1,7 @@
 import os
 import sys
+import subprocess
+import importlib
 
 _real_init = None
 for _entry in sys.path:
@@ -16,6 +18,29 @@ __path__ = [os.path.dirname(_real_init)]
 __file__ = _real_init
 with open(_real_init, 'rb') as _f:
     exec(compile(_f.read(), _real_init, 'exec'), globals(), globals())
+
+# Provide an ffmpeg executable for the following GitHub Actions step.
+try:
+    import imageio_ffmpeg
+except Exception:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', 'imageio-ffmpeg'])
+    importlib.invalidate_caches()
+    import imageio_ffmpeg
+
+_ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+_ffmpeg_dir = '/tmp/cosyvoice-bin'
+os.makedirs(_ffmpeg_dir, exist_ok=True)
+_ffmpeg_link = os.path.join(_ffmpeg_dir, 'ffmpeg')
+try:
+    if os.path.lexists(_ffmpeg_link):
+        os.remove(_ffmpeg_link)
+    os.symlink(_ffmpeg_exe, _ffmpeg_link)
+except OSError:
+    pass
+_github_path = os.environ.get('GITHUB_PATH')
+if _github_path:
+    with open(_github_path, 'a', encoding='utf-8') as _f:
+        _f.write(_ffmpeg_dir + '\n')
 
 _original_predict = Client.predict
 
