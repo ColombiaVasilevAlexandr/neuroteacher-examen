@@ -1,0 +1,25 @@
+name: CosyVoice API Probe
+
+on:
+  push:
+    branches:
+      - audio/neural-audiobook-20260813
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Gradio client
+        run: pip install -q gradio_client
+      - name: Inspect CosyVoice Space API
+        run: |
+          python - <<'PY'
+          from gradio_client import Client
+          c = Client('FunAudioLLM/Fun-CosyVoice3-0.5B')
+          print(c.view_api())
+          PY
