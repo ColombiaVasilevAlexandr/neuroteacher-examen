@@ -1,0 +1,40 @@
+name: CosyVoice length probe
+
+on:
+  push:
+    branches: [audio/cosyvoice-full-20260813]
+    paths: ['.length-probe-trigger']
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -q gradio_client edge-tts
+      - name: Probe lengths
+        run: |
+          python - <<'PY'
+          import asyncio, edge_tts, time
+          from edge_tts import VoicesManager
+          from gradio_client import Client, handle_file
+          prompt='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+          async def ref():
+              vm=await VoicesManager.create(); v=vm.find(Locale='ru-RU',Gender='Male')[0]['Name']
+              await edge_tts.Communicate(prompt,v,rate='-8%').save('/tmp/p.mp3')
+          asyncio.run(ref())
+          base='Колумбия расположена на северо-западе Южной Америки. Столица страны — Богота. Государство омывается водами Карибского моря и Тихого океана. Климат страны очень разнообразен из-за рельефа, высоты над уровнем моря и близости океанов. В Андах выделяют жаркий, умеренный, холодный пояса и парамо. '
+          c=Client('FunAudioLLM/Fun-CosyVoice3-0.5B',verbose=False)
+          allowed='You are a helpful assistant. Please say a sentence in a very soft voice.<|endofprompt|>'
+          for n in [160,220,280,340,420]:
+              t=(base*3)[:n]
+              try:
+                  r=c.predict(t,'zero_shot',prompt,handle_file('/tmp/p.mp3'),None,allowed,424242,False,'En',api_name='/generate_audio')
+                  print('PASS',n,r)
+              except Exception as e:
+                  print('FAIL',n,repr(e))
+              time.sleep(2)
+          PY
