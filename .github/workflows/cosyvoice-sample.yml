@@ -1,12 +1,14 @@
 name: CosyVoice sample
 
 on:
-  issues:
-    types: [opened]
+  push:
+    branches: [main]
+    paths:
+      - '.cosyvoice-trigger'
+  workflow_dispatch:
 
 jobs:
   synthesize:
-    if: github.event.issue.title == '[COSYVOICE-SAMPLE]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
