@@ -1,0 +1,109 @@
+name: CosyVoice full geography
+
+on:
+  push:
+    branches: [audio/cosyvoice-full-20260813]
+    paths: ['.full-geography-trigger']
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install clients
+        run: pip install -q gradio_client edge-tts imageio-ffmpeg
+      - name: Generate approved male reference
+        run: |
+          python - <<'PY'
+          import asyncio, edge_tts
+          from edge_tts import VoicesManager
+          prompt='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+          async def main():
+              vm=await VoicesManager.create()
+              v=vm.find(Locale='ru-RU', Gender='Male')[0]['Name']
+              await edge_tts.Communicate(prompt, v, rate='-8%').save('/tmp/male_prompt.mp3')
+          asyncio.run(main())
+          PY
+      - name: Synthesize geography with CosyVoice3
+        run: |
+          python - <<'PY'
+          from gradio_client import Client, handle_file
+          from pathlib import Path
+          import re, time, shutil, wave
+
+          prompt='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+          allowed='You are a helpful assistant. Please say a sentence in a very soft voice.<|endofprompt|>'
+          text=Path('audio_texts/01_geography.txt').read_text(encoding='utf-8')
+          clean=[]
+          for line in text.splitlines():
+              s=line.strip()
+              if not s: clean.append(''); continue
+              low=s.lower()
+              if s.startswith('File:') or 'http://' in low or 'https://' in low or '.pdf/' in low or 'version=' in low:
+                  continue
+              clean.append(s)
+          text='\n'.join(clean)
+          paras=[re.sub(r'\s+',' ',p).strip() for p in re.split(r'\n\s*\n',text) if p.strip()]
+          pieces=[]
+          for p in paras:
+              sentences=re.split(r'(?<=[.!?…])\s+',p)
+              cur=''
+              for sent in sentences:
+                  if len(sent)>720:
+                      if cur: pieces.append(cur); cur=''
+                      for i in range(0,len(sent),650): pieces.append(sent[i:i+650])
+                  elif len(cur)+len(sent)+1<=720:
+                      cur=(cur+' '+sent).strip()
+                  else:
+                      if cur: pieces.append(cur)
+                      cur=sent
+              if cur: pieces.append(cur)
+          print('chunks',len(pieces),'chars',len(text))
+          out=Path('/tmp/cosy_chunks'); out.mkdir(exist_ok=True)
+          client=Client('FunAudioLLM/Fun-CosyVoice3-0.5B', verbose=False)
+          wavs=[]
+          for i,piece in enumerate(pieces,1):
+              target=out/f'{i:04d}.wav'
+              if target.exists(): wavs.append(target); continue
+              last=None
+              for attempt in range(6):
+                  try:
+                      r=client.predict(piece,'zero_shot',prompt,handle_file('/tmp/male_prompt.mp3'),None,allowed,424242,False,'En',api_name='/generate_audio')
+                      src=r[0] if isinstance(r,(list,tuple)) else r
+                      if isinstance(src,dict): src=src.get('path') or src.get('name')
+                      shutil.copyfile(src,target)
+                      last=None; break
+                  except Exception as e:
+                      last=e; print('retry',i,attempt+1,repr(e)); time.sleep(6*(attempt+1))
+              if last: raise last
+              wavs.append(target)
+              if i%10==0: print('done',i,'/',len(pieces))
+          with wave.open(str(wavs[0]),'rb') as w0:
+              params=w0.getparams()
+          with wave.open('/tmp/geography.wav','wb') as outw:
+              outw.setparams(params)
+              silence=b'\x00'*(params.sampwidth*params.nchannels*int(params.framerate*0.22))
+              for wp in wavs:
+                  with wave.open(str(wp),'rb') as w:
+                      if (w.getnchannels(),w.getsampwidth(),w.getframerate()) != (params.nchannels,params.sampwidth,params.framerate):
+                          raise RuntimeError('WAV format mismatch')
+                      outw.writeframes(w.readframes(w.getnframes()))
+                  outw.writeframes(silence)
+          PY
+      - name: Encode MP3 slightly slower
+        run: |
+          python - <<'PY'
+          import imageio_ffmpeg, subprocess, os
+          ff=imageio_ffmpeg.get_ffmpeg_exe()
+          os.makedirs('out',exist_ok=True)
+          subprocess.run([ff,'-y','-i','/tmp/geography.wav','-filter:a','atempo=0.92','-ac','1','-c:a','libmp3lame','-b:a','96k','out/01_geography_cosyvoice_male_slow.mp3'],check=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-geography-cosyvoice-male-slow
+          path: out/01_geography_cosyvoice_male_slow.mp3
+          if-no-files-found: error
