@@ -1,0 +1,106 @@
+name: CosyVoice full constitution
+
+on:
+  push:
+    branches: [audio/cosyvoice-full-20260813]
+    paths: ['.full-constitution-trigger']
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -q gradio_client edge-tts imageio-ffmpeg
+      - name: Generate approved male reference
+        run: |
+          python - <<'PY'
+          import asyncio, edge_tts
+          from edge_tts import VoicesManager
+          p='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+          async def main():
+              vm=await VoicesManager.create(); v=vm.find(Locale='ru-RU',Gender='Male')[0]['Name']
+              print('male voice',v); await edge_tts.Communicate(p,v,rate='-8%').save('/tmp/male_prompt.mp3')
+          asyncio.run(main())
+          PY
+      - name: Reconstruct and synthesize constitution
+        run: |
+          python - <<'PY'
+          from gradio_client import Client, handle_file
+          from pathlib import Path
+          import gzip,re,time,shutil,wave
+          prompt='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+          allowed='You are a helpful assistant. Please say a sentence in a very soft voice.<|endofprompt|>'
+          hx=''.join(p.read_text().strip() for p in sorted(Path('audio_payload').glob('03_constitution.hex.part*')))
+          text=gzip.decompress(bytes.fromhex(hx)).decode('utf-8')
+          clean=[]
+          for line in text.splitlines():
+              s=line.strip(); low=s.lower()
+              if not s: clean.append(''); continue
+              if s.startswith('File:') or 'http://' in low or 'https://' in low or '.pdf/' in low or 'version=' in low: continue
+              clean.append(s)
+          text='\n'.join(clean)
+          paras=[re.sub(r'\s+',' ',p).strip() for p in re.split(r'\n\s*\n',text) if p.strip()]
+          raw=[]; MAX=430
+          for p in paras:
+              ss=re.split(r'(?<=[.!?…])\s+',p); cur=''
+              for sent in ss:
+                  if len(sent)>MAX:
+                      if cur: raw.append(cur); cur=''
+                      ch=''
+                      for w in sent.split():
+                          if len(ch)+len(w)+1<=MAX: ch=(ch+' '+w).strip()
+                          else:
+                              if ch: raw.append(ch)
+                              ch=w
+                      if ch: raw.append(ch)
+                  elif len(cur)+len(sent)+1<=MAX: cur=(cur+' '+sent).strip()
+                  else:
+                      if cur: raw.append(cur)
+                      cur=sent
+              if cur: raw.append(cur)
+          pieces=[]
+          for x in raw:
+              if pieces and len(x)<90 and len(pieces[-1])+len(x)+1<=MAX: pieces[-1]+=' '+x
+              else: pieces.append(x)
+          if len(pieces)>1 and len(pieces[0])<90: pieces[1]=pieces[0]+' '+pieces[1]; pieces=pieces[1:]
+          print('chunks',len(pieces),'chars',len(text),'first_len',len(pieces[0]),flush=True)
+          client=Client('FunAudioLLM/Fun-CosyVoice3-0.5B',verbose=False); out=Path('/tmp/c'); out.mkdir(exist_ok=True); wavs=[]
+          for i,piece in enumerate(pieces,1):
+              target=out/f'{i:04d}.wav'; last=None
+              for attempt in range(8):
+                  try:
+                      r=client.predict(piece,'zero_shot',prompt,handle_file('/tmp/male_prompt.mp3'),None,allowed,424242,False,'En',api_name='/generate_audio')
+                      src=r[0] if isinstance(r,(list,tuple)) else r
+                      if isinstance(src,dict): src=src.get('path') or src.get('name')
+                      shutil.copyfile(src,target); last=None; break
+                  except Exception as e:
+                      last=e; print('retry',i,attempt+1,'len',len(piece),repr(e),flush=True); time.sleep(min(15*(attempt+1),90))
+                      try: client=Client('FunAudioLLM/Fun-CosyVoice3-0.5B',verbose=False)
+                      except Exception: pass
+              if last: raise last
+              wavs.append(target)
+              if i%5==0: print('done',i,'/',len(pieces),flush=True)
+              time.sleep(1)
+          with wave.open(str(wavs[0]),'rb') as w0: params=w0.getparams()
+          with wave.open('/tmp/constitution.wav','wb') as o:
+              o.setparams(params); silence=b'\x00'*(params.sampwidth*params.nchannels*int(params.framerate*0.22))
+              for wp in wavs:
+                  with wave.open(str(wp),'rb') as w: o.writeframes(w.readframes(w.getnframes()))
+                  o.writeframes(silence)
+          PY
+      - name: Encode MP3 slightly slower
+        run: |
+          python - <<'PY'
+          import imageio_ffmpeg,subprocess,os
+          ff=imageio_ffmpeg.get_ffmpeg_exe(); os.makedirs('out',exist_ok=True)
+          subprocess.run([ff,'-y','-i','/tmp/constitution.wav','-filter:a','atempo=0.92','-ac','1','-c:a','libmp3lame','-b:a','96k','out/03_constitution_cosyvoice_male_slow.mp3'],check=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-constitution-cosyvoice-male-slow
+          path: out/03_constitution_cosyvoice_male_slow.mp3
+          if-no-files-found: error
