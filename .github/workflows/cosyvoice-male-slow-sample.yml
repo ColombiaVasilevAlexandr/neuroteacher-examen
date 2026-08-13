@@ -1,0 +1,87 @@
+name: CosyVoice male slow sample
+
+on:
+  push:
+    branches: [audio/cosyvoice-male-slow-20260813]
+    paths:
+      - '.cosyvoice-male-slow-trigger'
+  workflow_dispatch:
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install clients
+        run: pip install -q gradio_client edge-tts imageio-ffmpeg
+      - name: Generate male Russian reference
+        run: |
+          cd /tmp
+          python - <<'PY'
+          import asyncio
+          import edge_tts
+          from edge_tts import VoicesManager
+
+          prompt = 'Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+
+          async def main():
+              voices = await VoicesManager.create()
+              matches = voices.find(Locale='ru-RU', Gender='Male')
+              if not matches:
+                  raise RuntimeError('Russian male Edge TTS voice not found')
+              voice = matches[0]['Name']
+              print('Using male reference voice:', voice)
+              await edge_tts.Communicate(prompt, voice, rate='-8%').save('/tmp/male_prompt.mp3')
+
+          asyncio.run(main())
+          PY
+      - name: Generate CosyVoice sample
+        run: |
+          cd /tmp
+          mkdir -p out
+          python - <<'PY'
+          from gradio_client import Client, handle_file
+          import os, shutil, subprocess
+          import imageio_ffmpeg
+
+          text = ('Колумбия расположена на северо-западе Южной Америки. '
+                  'Столица страны — Богота. Государство омывается водами Карибского моря и Тихого океана.')
+          prompt_text = 'Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+          allowed_instruct = 'You are a helpful assistant. Please say a sentence in a very soft voice.<|endofprompt|>'
+
+          client = Client('FunAudioLLM/Fun-CosyVoice3-0.5B', verbose=True)
+          result = client.predict(
+              text,
+              'zero_shot',
+              prompt_text,
+              handle_file('/tmp/male_prompt.mp3'),
+              None,
+              allowed_instruct,
+              424242,
+              False,
+              'En',
+              api_name='/generate_audio',
+          )
+          print('Result:', result)
+          src = result[0] if isinstance(result, (list, tuple)) else result
+          if isinstance(src, dict):
+              src = src.get('path') or src.get('name')
+          if not src or not os.path.exists(src):
+              raise RuntimeError(f'No CosyVoice audio: {result!r}')
+
+          wav = '/tmp/out/cosyvoice_male_original.wav'
+          shutil.copyfile(src, wav)
+          mp3 = '/tmp/out/cosyvoice_male_slow_sample.mp3'
+          ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+          subprocess.run([ffmpeg, '-y', '-i', wav, '-filter:a', 'atempo=0.92', '-c:a', 'libmp3lame', '-b:a', '160k', mp3], check=True)
+          print('Created:', mp3)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cosyvoice-male-slow-sample
+          path: /tmp/out/cosyvoice_male_slow_sample.mp3
+          if-no-files-found: error
