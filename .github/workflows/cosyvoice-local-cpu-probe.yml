@@ -22,12 +22,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install -q --upgrade pip
+          python -m pip install -q --upgrade 'pip<26' 'setuptools<81' wheel
           pip install -q torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
           cd /tmp/CosyVoice
-          grep -vE '^(--extra-index-url|deepspeed|onnxruntime-gpu|tensorrt-cu12)' requirements.txt > /tmp/cosy-req.txt
+          # Whisper is only needed for optional prompt transcription; our approved prompt text is supplied explicitly.
+          grep -vE '^(--extra-index-url|deepspeed|onnxruntime-gpu|tensorrt-cu12|openai-whisper)' requirements.txt > /tmp/cosy-req.txt
           pip install -q -r /tmp/cosy-req.txt
           pip install -q onnxruntime==1.18.0 huggingface_hub edge-tts
+          python - <<'PY'
+          import torch, torchaudio, onnxruntime
+          print('torch', torch.__version__, 'cuda', torch.cuda.is_available())
+          print('torchaudio', torchaudio.__version__)
+          print('onnxruntime', onnxruntime.__version__)
+          PY
       - name: Download CosyVoice3 model
         run: |
           python - <<'PY'
@@ -43,7 +50,7 @@ jobs:
           python - <<'PY'
           import asyncio, subprocess, time, os, sys
           sys.path.append('third_party/Matcha-TTS')
-          import edge_tts, torchaudio
+          import edge_tts, torchaudio, torch
           from cosyvoice.cli.cosyvoice import AutoModel
 
           prompt='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
@@ -59,7 +66,9 @@ jobs:
           t1=time.time(); outs=[]
           for x in model.inference_zero_shot(text,'You are a helpful assistant.<|endofprompt|>'+prompt,'/tmp/ref.wav',stream=False,speed=0.92):
               outs.append(x['tts_speech'])
-          audio=__import__('torch').concat(outs,dim=1)
+          if not outs:
+              raise RuntimeError('CosyVoice returned no audio')
+          audio=torch.concat(outs,dim=1)
           torchaudio.save('/tmp/cosy_local_probe.wav',audio,model.sample_rate)
           print('INFER_SEC',time.time()-t1,'AUDIO_SEC',audio.shape[1]/model.sample_rate,'BYTES',os.path.getsize('/tmp/cosy_local_probe.wav'),flush=True)
           PY
