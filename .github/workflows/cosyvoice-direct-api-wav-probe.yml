@@ -1,0 +1,59 @@
+name: CosyVoice direct API WAV probe
+
+on:
+  push:
+    branches: [audio/pdf-native-full-20260814]
+    paths: ['.github/workflows/cosyvoice-direct-api-wav-probe.yml']
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tools
+        run: pip install -q requests edge-tts imageio-ffmpeg
+      - name: Test zero-shot and cross-lingual
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import asyncio,json,os,subprocess
+          from pathlib import Path
+          import requests,edge_tts,imageio_ffmpeg
+          BASE='https://originalmmd-cosyvoice3-voicestudio.hf.space'
+          prompt='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+          text='Колумбия расположена на северо-западе Южной Америки. Столица страны — Богота.'
+          async def make(): await edge_tts.Communicate(prompt,'ru-RU-DmitryNeural',rate='-8%').save('/tmp/ref.mp3')
+          asyncio.run(make())
+          ff=imageio_ffmpeg.get_ffmpeg_exe()
+          subprocess.run([ff,'-y','-i','/tmp/ref.mp3','-ar','24000','-ac','1','-c:a','pcm_s16le','/tmp/ref.wav'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+          print('refbytes',os.path.getsize('/tmp/ref.wav'))
+          s=requests.Session()
+          with open('/tmp/ref.wav','rb') as fh:
+              r=s.post(BASE+'/gradio_api/upload',files={'files':('ref.wav',fh,'audio/wav')},timeout=120)
+          print('upload',r.status_code,r.text); r.raise_for_status(); path=r.json()[0]
+          fd={'path':path,'url':None,'size':os.path.getsize('/tmp/ref.wav'),'orig_name':'ref.wav','mime_type':'audio/wav','is_stream':False,'meta':{'_type':'gradio.FileData'}}
+          def call(api,data):
+              r=s.post(BASE+f'/gradio_api/call/{api}',json={'data':data},timeout=120)
+              print(api,'submit',r.status_code,r.text); r.raise_for_status(); ev=r.json()['event_id']
+              events=[]; current=None
+              with s.get(BASE+f'/gradio_api/call/{api}/{ev}',stream=True,timeout=1200) as rr:
+                  print(api,'stream',rr.status_code); rr.raise_for_status()
+                  for raw in rr.iter_lines(decode_unicode=True):
+                      line=(raw or '').strip()
+                      if line: print(api,line[:2000])
+                      if line.startswith('event:'): current=line.split(':',1)[1].strip()
+                      elif line.startswith('data:'):
+                          try: data=json.loads(line.split(':',1)[1].strip())
+                          except: data=line.split(':',1)[1].strip()
+                          events.append((current,data))
+              return events
+          for api,data in [('zero_shot',[text,prompt,fd,0.92,0]),('cross_lingual',[text,fd,0.92,0])]:
+              try:
+                  evs=call(api,data); print('EVENTS',api,repr(evs))
+              except Exception as e: print('CALLFAIL',api,repr(e))
+          PY
