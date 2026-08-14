@@ -25,7 +25,11 @@ jobs:
           from pathlib import Path
           p=Path('scripts/cosy_full_parallel.py')
           s=p.read_text(encoding='utf-8')
-          old="""    digest = hashlib.sha256(payload.encode('ascii')).hexdigest()\n    if digest != spec['sha256']:\n        raise ValueError(f'payload sha256 {digest} != {spec[\"sha256\"]}: {[str(p) for p in paths]}')\n"""
+          old=(
+              "    digest = hashlib.sha256(payload.encode('ascii')).hexdigest()\n"
+              "    if digest != spec['sha256']:\n"
+              "        raise ValueError(f'payload sha256 {digest} != {spec[\"sha256\"]}: {[str(p) for p in paths]}')\n"
+          )
           if old not in s:
               raise SystemExit('validation block not found')
           p.write_text(s.replace(old,''),encoding='utf-8')
@@ -66,47 +70,49 @@ jobs:
           from pathlib import Path
           p=Path('scripts/cosy_full_parallel.py')
           s=p.read_text(encoding='utf-8')
-          old="""        outs = []
-        for item in model.inference_zero_shot(txt, full, ref, zero_shot_spk_id=sid, stream=False, speed=0.92):
-            outs.append(item['tts_speech'].cpu())
-        if not outs:
-            raise RuntimeError(f'No audio for segment {seg[\"index\"]}')
-        audio = torch.cat(outs, dim=1)
-"""
-          new="""        if not re.search(r'[0-9A-Za-zА-Яа-яЁёÁÉÍÓÚÜÑáéíóúüñ]', txt):
-            audio = silence(0.35)
-            pieces.append(audio)
-            if seg.get('pause_after', 0) > 0:
-                pieces.append(silence(float(seg['pause_after'])))
-            print(f'SHARD {shard} SEG {k}/{len(segs)} idx={seg[\"index\"]} placeholder=silence', flush=True)
-            continue
-        outs = []
-        audio = None
-        try:
-            for item in model.inference_zero_shot(txt, full, ref, zero_shot_spk_id=sid, stream=False, speed=0.92, text_frontend=False):
-                outs.append(item['tts_speech'].cpu())
-            if outs:
-                audio = torch.cat(outs, dim=1)
-        except RuntimeError as exc:
-            if 'Input and output sizes should be greater than 0' not in str(exc):
-                raise
-            print(f'COSY_ZERO_LENGTH idx={seg[\"index\"]} text={txt!r}', flush=True)
-        if audio is None or audio.numel() == 0 or audio.shape[1] < int(0.08 * model.sample_rate):
-            import edge_tts
-            voice = 'ru-RU-DmitryNeural' if lang == 'ru' else 'es-CO-GonzaloNeural'
-            fb_mp3 = work / f'fallback_{shard}_{seg[\"index\"]}.mp3'
-            fb_wav = work / f'fallback_{shard}_{seg[\"index\"]}.wav'
-            async def _fallback():
-                await edge_tts.Communicate(txt, voice, rate='-8%').save(str(fb_mp3))
-            asyncio.run(_fallback())
-            subprocess.run(['ffmpeg','-y','-loglevel','error','-i',str(fb_mp3),'-ar',str(model.sample_rate),'-ac','1','-c:a','pcm_s16le',str(fb_wav)], check=True)
-            audio, sr = torchaudio.load(str(fb_wav))
-            if sr != model.sample_rate:
-                audio = torchaudio.functional.resample(audio, sr, model.sample_rate)
-            if audio.numel() == 0 or audio.shape[1] == 0:
-                raise RuntimeError(f'Fallback produced no audio for segment {seg[\"index\"]}')
-            print(f'EDGE_FALLBACK idx={seg[\"index\"]} lang={lang} chars={len(txt)} audio_sec={audio.shape[1] / model.sample_rate:.2f}', flush=True)
-"""
+          old=(
+              "        outs = []\n"
+              "        for item in model.inference_zero_shot(txt, full, ref, zero_shot_spk_id=sid, stream=False, speed=0.92):\n"
+              "            outs.append(item['tts_speech'].cpu())\n"
+              "        if not outs:\n"
+              "            raise RuntimeError(f'No audio for segment {seg[\"index\"]}')\n"
+              "        audio = torch.cat(outs, dim=1)\n"
+          )
+          new=(
+              "        if not re.search(r'[0-9A-Za-zА-Яа-яЁёÁÉÍÓÚÜÑáéíóúüñ]', txt):\n"
+              "            audio = silence(0.35)\n"
+              "            pieces.append(audio)\n"
+              "            if seg.get('pause_after', 0) > 0:\n"
+              "                pieces.append(silence(float(seg['pause_after'])))\n"
+              "            print(f'SHARD {shard} SEG {k}/{len(segs)} idx={seg[\"index\"]} placeholder=silence', flush=True)\n"
+              "            continue\n"
+              "        outs = []\n"
+              "        audio = None\n"
+              "        try:\n"
+              "            for item in model.inference_zero_shot(txt, full, ref, zero_shot_spk_id=sid, stream=False, speed=0.92, text_frontend=False):\n"
+              "                outs.append(item['tts_speech'].cpu())\n"
+              "            if outs:\n"
+              "                audio = torch.cat(outs, dim=1)\n"
+              "        except RuntimeError as exc:\n"
+              "            if 'Input and output sizes should be greater than 0' not in str(exc):\n"
+              "                raise\n"
+              "            print(f'COSY_ZERO_LENGTH idx={seg[\"index\"]} text={txt!r}', flush=True)\n"
+              "        if audio is None or audio.numel() == 0 or audio.shape[1] < int(0.08 * model.sample_rate):\n"
+              "            import edge_tts\n"
+              "            voice = 'ru-RU-DmitryNeural' if lang == 'ru' else 'es-CO-GonzaloNeural'\n"
+              "            fb_mp3 = work / f'fallback_{shard}_{seg[\"index\"]}.mp3'\n"
+              "            fb_wav = work / f'fallback_{shard}_{seg[\"index\"]}.wav'\n"
+              "            async def _fallback():\n"
+              "                await edge_tts.Communicate(txt, voice, rate='-8%').save(str(fb_mp3))\n"
+              "            asyncio.run(_fallback())\n"
+              "            subprocess.run(['ffmpeg','-y','-loglevel','error','-i',str(fb_mp3),'-ar',str(model.sample_rate),'-ac','1','-c:a','pcm_s16le',str(fb_wav)], check=True)\n"
+              "            audio, sr = torchaudio.load(str(fb_wav))\n"
+              "            if sr != model.sample_rate:\n"
+              "                audio = torchaudio.functional.resample(audio, sr, model.sample_rate)\n"
+              "            if audio.numel() == 0 or audio.shape[1] == 0:\n"
+              "                raise RuntimeError(f'Fallback produced no audio for segment {seg[\"index\"]}')\n"
+              "            print(f'EDGE_FALLBACK idx={seg[\"index\"]} lang={lang} chars={len(txt)} audio_sec={audio.shape[1] / model.sample_rate:.2f}', flush=True)\n"
+          )
           if old not in s:
               raise SystemExit('render block not found')
           p.write_text(s.replace(old,new),encoding='utf-8')
