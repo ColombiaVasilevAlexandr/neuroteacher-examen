@@ -1,0 +1,176 @@
+name: PDF recover and render RU-ES audiobook
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - audio/pdf-native-full-20260814
+    paths:
+      - '.recover-render-trigger'
+      - '.github/workflows/pdf-native-recover-render.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install neural TTS tools
+        run: pip install -q edge-tts imageio-ffmpeg
+      - name: Recover exact PDF-extracted text from existing fragments
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip, itertools, re
+
+          SRC=Path('pdf_payload_v2')
+          OUT=Path('/tmp/pdf_audio_texts'); OUT.mkdir(parents=True,exist_ok=True)
+          B64=set('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=')
+
+          specs={
+            '01_geography': (13148,18000),
+            '02_history': (42064,60000),
+            '03_constitution': (27792,47000),
+            '04_spanish_bilingual': (39336,60000),
+          }
+
+          def clean(s):
+              return ''.join(ch for ch in s if ch in B64)
+
+          def valid(payload, minchars):
+              try:
+                  raw=base64.b64decode(payload, validate=True)
+                  text=gzip.decompress(raw).decode('utf-8')
+                  if len(text) < minchars:
+                      return None
+                  return text
+              except Exception:
+                  return None
+
+          def overlap(a,b,min_k=8):
+              maxk=min(len(a),len(b))
+              for k in range(maxk, min_k-1, -1):
+                  if a[-k:]==b[:k]: return k
+              return 0
+
+          def assemble_order(frags, order):
+              s=frags[order[0]]
+              for idx in order[1:]:
+                  b=frags[idx]
+                  if b in s: continue
+                  k=overlap(s,b)
+                  s += b[k:]
+              return s
+
+          def recover(name, expected, minchars):
+              files=[]
+              single=SRC/f'{name}.gz.b64'
+              if single.exists(): files.append(single)
+              files += sorted(SRC.glob(f'{name}.gz.b64.part*'))
+              frags=[]
+              for p in files:
+                  s=clean(p.read_text(encoding='ascii',errors='ignore'))
+                  if s and s not in frags:
+                      frags.append(s)
+              print('\n',name,'expected=',expected,'fragments=',[(len(f),f[:8],f[-8:]) for f in frags],flush=True)
+
+              # Easy direct candidates first.
+              for f in frags:
+                  if len(f)==expected:
+                      t=valid(f,minchars)
+                      if t is not None:
+                          print(name,'direct fragment success',len(f),flush=True); return t
+              parts=sorted(SRC.glob(f'{name}.gz.b64.part*'))
+              if parts:
+                  c=clean(''.join(p.read_text(encoding='ascii',errors='ignore') for p in parts))
+                  if len(c)==expected:
+                      t=valid(c,minchars)
+                      if t is not None:
+                          print(name,'sorted parts success',len(c),flush=True); return t
+
+              # Build candidate strings from every permutation, using exact overlaps.
+              n=len(frags)
+              orders=[]
+              for r in range(1,n+1):
+                  orders.extend(itertools.permutations(range(n),r))
+              seen=set()
+              for order in orders:
+                  s=assemble_order(frags,order)
+                  if not s.startswith('H4sI'):
+                      continue
+                  # The exact stream must start at H4sI and have expected base64 length.
+                  candidates=[]
+                  if len(s)>=expected:
+                      candidates.append(s[:expected])
+                  if len(s)==expected:
+                      candidates.append(s)
+                  for c in candidates:
+                      if c in seen: continue
+                      seen.add(c)
+                      t=valid(c,minchars)
+                      if t is not None:
+                          print(name,'permutation success',order,'assembled=',len(s),flush=True); return t
+
+              # More flexible graph search: append suffixes of fragments that match the
+              # current tail; this tolerates fragments that contain duplicated prefixes.
+              starts=[]
+              for i,f in enumerate(frags):
+                  pos=f.find('H4sI')
+                  if pos>=0: starts.append((f[pos:],(i,)))
+              stack=starts[:]
+              visited=set()
+              while stack:
+                  s,used=stack.pop()
+                  key=(s[-128:] if len(s)>128 else s, used, min(len(s),expected+2000))
+                  if key in visited: continue
+                  visited.add(key)
+                  if len(s)>=expected:
+                      c=s[:expected]
+                      t=valid(c,minchars)
+                      if t is not None:
+                          print(name,'graph success used=',used,'len=',len(s),flush=True); return t
+                      if len(s)>expected+2000: continue
+                  if len(used)>=7: continue
+                  for j,b in enumerate(frags):
+                      if j in used and len(frags)>1: continue
+                      # Try all meaningful suffix-prefix overlaps; longest first.
+                      maxk=min(len(s),len(b))
+                      hits=[]
+                      for k in range(maxk,31,-1):
+                          if s[-k:]==b[:k]:
+                              hits.append(k)
+                              if len(hits)>=3: break
+                      for k in hits:
+                          stack.append((s+b[k:],used+(j,)))
+
+              raise SystemExit(f'Could not recover {name}')
+
+          for name,(expected,minchars) in specs.items():
+              text=recover(name,expected,minchars)
+              outname='04_spanish_bilingual.txt' if name=='04_spanish_bilingual' else name+'.txt'
+              (OUT/outname).write_text(text,encoding='utf-8')
+              print(name,'RECOVERED chars=',len(text),'bytes=',len(text.encode('utf-8')),flush=True)
+          PY
+      - name: Render full MP3 with native Russian and Colombian Spanish voices
+        run: python scripts/build_pdf_audio.py
+      - name: Validate final MP3
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3
+          test $(stat -c%s uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3) -gt 20000000
+          ls -lh uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-audiobook-pdf-native-ru-es-recovered
+          path: uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3
+          if-no-files-found: error
+          retention-days: 30
