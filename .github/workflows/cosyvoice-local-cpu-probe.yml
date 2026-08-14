@@ -25,15 +25,17 @@ jobs:
           python -m pip install -q --upgrade 'pip<26' 'setuptools<81' wheel
           pip install -q torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
           cd /tmp/CosyVoice
-          # Whisper is only needed for optional prompt transcription; our approved prompt text is supplied explicitly.
           grep -vE '^(--extra-index-url|deepspeed|onnxruntime-gpu|tensorrt-cu12|openai-whisper)' requirements.txt > /tmp/cosy-req.txt
           pip install -q -r /tmp/cosy-req.txt
           pip install -q onnxruntime==1.18.0 huggingface_hub edge-tts
+          # CosyVoice uses whisper.log_mel_spectrogram to tokenize the reference audio.
+          pip install -q --no-build-isolation openai-whisper==20231117
           python - <<'PY'
-          import torch, torchaudio, onnxruntime
+          import torch, torchaudio, onnxruntime, whisper
           print('torch', torch.__version__, 'cuda', torch.cuda.is_available())
           print('torchaudio', torchaudio.__version__)
           print('onnxruntime', onnxruntime.__version__)
+          print('whisper', whisper.__file__)
           PY
       - name: Download CosyVoice3 model
         run: |
