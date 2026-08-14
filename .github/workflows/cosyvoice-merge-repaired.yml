@@ -21,6 +21,8 @@ jobs:
       BASE_RUN: '31794117855'
       REPAIR_RUN: '31805893717'
     steps:
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Wait until required shard artifacts exist
         shell: bash
         run: |
