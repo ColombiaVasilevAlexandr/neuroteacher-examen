@@ -1,4 +1,4 @@
-name: CosyVoice3 full PDF audiobook parallel CPU
+name: CosyVoice3 targeted repair shards 14 and 17
 
 on:
   workflow_dispatch:
@@ -6,11 +6,6 @@ on:
     branches: [audio/pdf-native-full-20260814]
     paths:
       - '.github/workflows/cosyvoice-full-cpu-parallel.yml'
-      - '.cosy-full-cpu-trigger'
-      - 'scripts/cosy_full_parallel.py'
-      - 'cosy_clean_payload4k/**'
-      - 'pdf_payload_v2/01_geography.gz.b64'
-      - 'pdf_payload_v2/02_history.gz.b64.part*'
 
 permissions:
   contents: write
@@ -38,13 +33,6 @@ jobs:
       - name: Validate exact PDF text and create render plan
         run: |
           python scripts/cosy_full_parallel.py prepare --out /tmp/cosy_plan.json --shards 20
-      - name: Show plan summary
-        run: |
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/cosy_plan.json',encoding='utf-8'))
-          print(json.dumps(d['stats'],ensure_ascii=False,indent=2))
-          PY
       - uses: actions/upload-artifact@v4
         with:
           name: cosy-render-plan
@@ -58,9 +46,9 @@ jobs:
     timeout-minutes: 330
     strategy:
       fail-fast: false
-      max-parallel: 20
+      max-parallel: 2
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        shard: [14, 17]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -70,7 +58,7 @@ jobs:
         with:
           name: cosy-render-plan
           path: /tmp/plan
-      - name: Bypass WeText for pre-cleaned PDF narration
+      - name: Patch zero-length fragments safely
         shell: bash
         run: |
           set -euo pipefail
@@ -78,12 +66,51 @@ jobs:
           from pathlib import Path
           p=Path('scripts/cosy_full_parallel.py')
           s=p.read_text(encoding='utf-8')
-          old="for item in model.inference_zero_shot(txt, full, ref, zero_shot_spk_id=sid, stream=False, speed=0.92):"
-          new="for item in model.inference_zero_shot(txt, full, ref, zero_shot_spk_id=sid, stream=False, speed=0.92, text_frontend=False):"
+          old="""        outs = []
+        for item in model.inference_zero_shot(txt, full, ref, zero_shot_spk_id=sid, stream=False, speed=0.92):
+            outs.append(item['tts_speech'].cpu())
+        if not outs:
+            raise RuntimeError(f'No audio for segment {seg[\"index\"]}')
+        audio = torch.cat(outs, dim=1)
+"""
+          new="""        if not re.search(r'[0-9A-Za-zА-Яа-яЁёÁÉÍÓÚÜÑáéíóúüñ]', txt):
+            audio = silence(0.35)
+            pieces.append(audio)
+            if seg.get('pause_after', 0) > 0:
+                pieces.append(silence(float(seg['pause_after'])))
+            print(f'SHARD {shard} SEG {k}/{len(segs)} idx={seg[\"index\"]} placeholder=silence', flush=True)
+            continue
+        outs = []
+        audio = None
+        try:
+            for item in model.inference_zero_shot(txt, full, ref, zero_shot_spk_id=sid, stream=False, speed=0.92, text_frontend=False):
+                outs.append(item['tts_speech'].cpu())
+            if outs:
+                audio = torch.cat(outs, dim=1)
+        except RuntimeError as exc:
+            if 'Input and output sizes should be greater than 0' not in str(exc):
+                raise
+            print(f'COSY_ZERO_LENGTH idx={seg[\"index\"]} text={txt!r}', flush=True)
+        if audio is None or audio.numel() == 0 or audio.shape[1] < int(0.08 * model.sample_rate):
+            import edge_tts
+            voice = 'ru-RU-DmitryNeural' if lang == 'ru' else 'es-CO-GonzaloNeural'
+            fb_mp3 = work / f'fallback_{shard}_{seg[\"index\"]}.mp3'
+            fb_wav = work / f'fallback_{shard}_{seg[\"index\"]}.wav'
+            async def _fallback():
+                await edge_tts.Communicate(txt, voice, rate='-8%').save(str(fb_mp3))
+            asyncio.run(_fallback())
+            subprocess.run(['ffmpeg','-y','-loglevel','error','-i',str(fb_mp3),'-ar',str(model.sample_rate),'-ac','1','-c:a','pcm_s16le',str(fb_wav)], check=True)
+            audio, sr = torchaudio.load(str(fb_wav))
+            if sr != model.sample_rate:
+                audio = torchaudio.functional.resample(audio, sr, model.sample_rate)
+            if audio.numel() == 0 or audio.shape[1] == 0:
+                raise RuntimeError(f'Fallback produced no audio for segment {seg[\"index\"]}')
+            print(f'EDGE_FALLBACK idx={seg[\"index\"]} lang={lang} chars={len(txt)} audio_sec={audio.shape[1] / model.sample_rate:.2f}', flush=True)
+"""
           if old not in s:
-              raise SystemExit('CosyVoice inference call not found')
+              raise SystemExit('render block not found')
           p.write_text(s.replace(old,new),encoding='utf-8')
-          print('WeText bypass enabled for already-cleaned Russian and Spanish text')
+          print('Safe zero-length fallback enabled')
           PY
       - name: Install system tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq sox libsox-dev ffmpeg
@@ -100,12 +127,6 @@ jobs:
           pip install -q -r /tmp/cosy-req.txt
           pip install -q onnxruntime==1.18.0 huggingface_hub edge-tts
           pip install -q --no-build-isolation openai-whisper==20231117
-          python - <<'PY'
-          import torch,torchaudio,onnxruntime,whisper
-          print('torch',torch.__version__,'cuda',torch.cuda.is_available())
-          print('torchaudio',torchaudio.__version__,'onnxruntime',onnxruntime.__version__)
-          print('whisper',whisper.__file__)
-          PY
       - name: Download official CosyVoice3 model
         run: |
           python - <<'PY'
@@ -113,7 +134,7 @@ jobs:
           p=snapshot_download('FunAudioLLM/Fun-CosyVoice3-0.5B-2512',local_dir='/tmp/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B')
           print(p)
           PY
-      - name: Render shard with CosyVoice3
+      - name: Render repaired shard with CosyVoice3
         shell: bash
         run: |
           set -euo pipefail
@@ -127,79 +148,9 @@ jobs:
             -ar 24000 -ac 1 -c:a libmp3lame -b:a 96k /tmp/render/shard_${{ matrix.shard }}.mp3
           test $(stat -c%s /tmp/render/shard_${{ matrix.shard }}.mp3) -gt 100000
           ffprobe -v error -show_entries format=duration,size -of json /tmp/render/shard_${{ matrix.shard }}.mp3
-          rm -f /tmp/render/shard_${{ matrix.shard }}.wav
       - uses: actions/upload-artifact@v4
         with:
           name: cosy-shard-${{ matrix.shard }}
           path: /tmp/render/shard_${{ matrix.shard }}.mp3
           if-no-files-found: error
           retention-days: 7
-
-  merge:
-    needs: render
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cosy-shard-*
-          path: /tmp/all_shards
-          merge-multiple: true
-      - name: Verify all 20 CosyVoice shards
-        shell: bash
-        run: |
-          set -euo pipefail
-          count=$(find /tmp/all_shards -maxdepth 1 -type f -name 'shard_*.mp3' | wc -l)
-          echo "shard_count=$count"
-          test "$count" -eq 20
-          ls -lh /tmp/all_shards | sort
-      - name: Merge and validate full CosyVoice MP3
-        shell: bash
-        run: |
-          set -euo pipefail
-          : > /tmp/concat.txt
-          find /tmp/all_shards -maxdepth 1 -type f -name 'shard_*.mp3' | sort -V | while read -r f; do
-            printf "file '%s'\n" "$f" >> /tmp/concat.txt
-          done
-          ffmpeg -y -loglevel error -f concat -safe 0 -i /tmp/concat.txt \
-            -ar 24000 -ac 1 -c:a libmp3lame -b:a 64k \
-            -metadata title='Учебное пособие по гражданству Колумбии — CosyVoice3' \
-            -metadata artist='CosyVoice3: Russian + Colombian Spanish male narration' \
-            /tmp/uchebnoe_posobie_kolumbiya_CosyVoice_male_slow_full.mp3
-          python - <<'PY'
-          import json,subprocess
-          p='/tmp/uchebnoe_posobie_kolumbiya_CosyVoice_male_slow_full.mp3'
-          r=subprocess.run(['ffprobe','-v','error','-show_entries','format=duration,size,bit_rate','-of','json',p],capture_output=True,text=True,check=True)
-          m=json.loads(r.stdout)['format']
-          duration=float(m['duration']); size=int(m['size'])
-          print(json.dumps(m,indent=2))
-          if duration < 10000: raise SystemExit(f'duration too short: {duration}')
-          if size < 20000000: raise SystemExit(f'file too small: {size}')
-          print('FULL_VALIDATED duration_hours=',duration/3600,'bytes=',size)
-          PY
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cosyvoice-full-book-final
-          path: /tmp/uchebnoe_posobie_kolumbiya_CosyVoice_male_slow_full.mp3
-          if-no-files-found: error
-          retention-days: 30
-      - name: Publish temporary downloadable chunks on build branch
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf generated_cosy
-          mkdir -p generated_cosy
-          split -b 24M -d -a 3 /tmp/uchebnoe_posobie_kolumbiya_CosyVoice_male_slow_full.mp3 generated_cosy/final.mp3.part-
-          sha256sum /tmp/uchebnoe_posobie_kolumbiya_CosyVoice_male_slow_full.mp3 | awk '{print $1}' > generated_cosy/sha256.txt
-          ffprobe -v error -show_entries format=duration,size,bit_rate -of json /tmp/uchebnoe_posobie_kolumbiya_CosyVoice_male_slow_full.mp3 > generated_cosy/ffprobe.json
-          find generated_cosy -maxdepth 1 -type f -name 'final.mp3.part-*' -printf '%f\n' | sort > generated_cosy/parts.txt
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add generated_cosy
-          git commit -m 'chore(audio): publish completed CosyVoice3 audiobook chunks'
-          git pull --rebase origin audio/pdf-native-full-20260814
-          git push origin HEAD:audio/pdf-native-full-20260814
