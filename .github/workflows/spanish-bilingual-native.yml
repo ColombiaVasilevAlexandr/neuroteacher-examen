@@ -1,0 +1,265 @@
+name: Spanish bilingual native voices
+
+on:
+  push:
+    branches:
+      - audio/cosyvoice-full-20260813
+    paths:
+      - '.spanish-bilingual-trigger'
+      - '.github/workflows/spanish-bilingual-native.yml'
+      - 'audio_payload/04_spanish.hex.part*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install TTS and ffmpeg helper
+        run: |
+          python -m pip install --upgrade pip
+          pip install edge-tts imageio-ffmpeg
+
+      - name: Restore Spanish-module source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/spanish_bilingual
+          cat audio_payload/04_spanish.hex.part* > /tmp/spanish_bilingual/source.hex
+          python - <<'PY'
+          from pathlib import Path
+          import binascii, gzip
+
+          h = ''.join(Path('/tmp/spanish_bilingual/source.hex').read_text().split())
+          raw = bytes.fromhex(h)
+          try:
+              text = gzip.decompress(raw).decode('utf-8')
+          except Exception as exc:
+              raise SystemExit(f'Cannot restore Spanish source payload: {exc}')
+          if len(text) < 20000:
+              raise SystemExit(f'Spanish source unexpectedly short: {len(text)} chars')
+          if 'Испан' not in text and 'испан' not in text.lower():
+              raise SystemExit('Restored source does not look like the Russian Spanish-language module')
+          Path('/tmp/spanish_bilingual/source.txt').write_text(text, encoding='utf-8')
+          print('restored_chars=', len(text))
+          print('restored_lines=', len(text.splitlines()))
+          PY
+
+      - name: Build bilingual native-voice MP3
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import asyncio
+          import re
+          import subprocess
+          import imageio_ffmpeg
+          import edge_tts
+
+          ROOT = Path('/tmp/spanish_bilingual')
+          SRC = ROOT / 'source.txt'
+          SEG = ROOT / 'segments'
+          SEG.mkdir(parents=True, exist_ok=True)
+          OUT = Path('04_spanish_bilingual_ru_es_native.mp3')
+
+          RU_VOICE = 'ru-RU-DmitryNeural'
+          ES_VOICE = 'es-CO-GonzaloNeural'
+          RATE = '-10%'
+          MAX_CHARS = 1500
+
+          cyr_re = re.compile(r'[А-Яа-яЁё]')
+          lat_re = re.compile(r'[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]')
+          url_re = re.compile(r'https?://\S+|www\.\S+', re.I)
+
+          text = SRC.read_text(encoding='utf-8', errors='ignore')
+          cleaned = []
+          for raw in text.splitlines():
+              s = re.sub(r'\s+', ' ', raw).strip()
+              if not s:
+                  cleaned.append('')
+                  continue
+              low = s.lower()
+              if url_re.search(s):
+                  s = url_re.sub('', s).strip(' -–—:;,.')
+                  if not s:
+                      continue
+              if re.fullmatch(r'(?:Стр\.\s*оригинала|Страница)\s*\d+', s, re.I):
+                  continue
+              if s.lower().startswith('file:'):
+                  continue
+              cleaned.append(s)
+
+          # Keep paragraph/sentence structure so the language switches only where useful.
+          text = '\n'.join(cleaned)
+          blocks = [re.sub(r'\s+', ' ', b).strip() for b in re.split(r'\n\s*\n', text) if b.strip()]
+
+          def counts(s):
+              return len(cyr_re.findall(s)), len(lat_re.findall(s))
+
+          def lang_of(s, default='ru'):
+              cy, la = counts(s)
+              if cy == 0 and la >= 2:
+                  return 'es'
+              if la == 0 and cy >= 1:
+                  return 'ru'
+              # Spanish punctuation is a strong signal even in mixed examples.
+              if ('¿' in s or '¡' in s) and la >= 3:
+                  return 'es'
+              # Mostly Cyrillic prose with a few Spanish terms stays Russian.
+              if cy >= max(3, la * 0.55):
+                  return 'ru'
+              if la >= max(4, cy * 1.8):
+                  return 'es'
+              return default
+
+          def split_mixed(s, default):
+              # First split explicit translation/example separators.
+              parts = re.split(r'\s+(?:—|–|->|→)\s+|\s+-\s+(?=[«“¿¡A-Za-zÁÉÍÓÚÜÑА-Яа-яЁё])', s)
+              result = []
+              for p in parts:
+                  p = p.strip()
+                  if not p:
+                      continue
+                  cy, la = counts(p)
+                  if cy and la:
+                      # Split a genuine script handoff only when both sides are meaningful.
+                      m = re.search(r'(?<=[A-Za-zÁÉÍÓÚÜÑáéíóúüñ])\s+(?=[А-Яа-яЁё])', p)
+                      if m:
+                          a, b = p[:m.start()].strip(), p[m.end():].strip()
+                          if len(lat_re.findall(a)) >= 4 and len(cyr_re.findall(b)) >= 4:
+                              result.extend([(lang_of(a, default), a), (lang_of(b, default), b)])
+                              continue
+                      m = re.search(r'(?<=[А-Яа-яЁё])\s+(?=[A-Za-zÁÉÍÓÚÜÑáéíóúüñ¿¡])', p)
+                      if m:
+                          a, b = p[:m.start()].strip(), p[m.end():].strip()
+                          if len(cyr_re.findall(a)) >= 4 and len(lat_re.findall(b)) >= 4:
+                              result.extend([(lang_of(a, default), a), (lang_of(b, default), b)])
+                              continue
+                  result.append((lang_of(p, default), p))
+              return result
+
+          fragments = []
+          current_default = 'ru'
+          for block in blocks:
+              # Sentence-size pieces reduce accidental mixed-language classification.
+              sentences = re.split(r'(?<=[.!?…])\s+|(?<=:)\s+(?=[A-ZÁÉÍÓÚÜÑА-ЯЁ¿¡])', block)
+              for sentence in sentences:
+                  sentence = sentence.strip()
+                  if not sentence:
+                      continue
+                  for lang, piece in split_mixed(sentence, current_default):
+                      if not piece:
+                          continue
+                      fragments.append((lang, piece))
+                      current_default = lang
+
+          # Merge consecutive same-language fragments, respecting the service text size.
+          chunks = []
+          for lang, piece in fragments:
+              piece = piece.strip()
+              if not piece:
+                  continue
+              if chunks and chunks[-1][0] == lang and len(chunks[-1][1]) + len(piece) + 1 <= MAX_CHARS:
+                  chunks[-1] = (lang, chunks[-1][1] + ' ' + piece)
+              else:
+                  while len(piece) > MAX_CHARS:
+                      cut = piece.rfind(' ', 0, MAX_CHARS)
+                      if cut < 300:
+                          cut = MAX_CHARS
+                      chunks.append((lang, piece[:cut].strip()))
+                      piece = piece[cut:].strip()
+                  if piece:
+                      chunks.append((lang, piece))
+
+          ru_chars = sum(len(t) for l, t in chunks if l == 'ru')
+          es_chars = sum(len(t) for l, t in chunks if l == 'es')
+          print('chunks=', len(chunks), 'ru_chars=', ru_chars, 'es_chars=', es_chars)
+          if ru_chars < 10000 or es_chars < 1000:
+              raise SystemExit(f'Language split sanity check failed: ru={ru_chars}, es={es_chars}')
+
+          async def render_one(i, lang, txt):
+              voice = RU_VOICE if lang == 'ru' else ES_VOICE
+              out = SEG / f'{i:04d}_{lang}.mp3'
+              # Retry transient network errors without changing voice/locale.
+              last = None
+              for attempt in range(6):
+                  try:
+                      await edge_tts.Communicate(txt, voice, rate=RATE).save(str(out))
+                      if out.exists() and out.stat().st_size > 500:
+                          return out
+                  except Exception as exc:
+                      last = exc
+                      await asyncio.sleep(min(3 * (attempt + 1), 15))
+              raise RuntimeError(f'TTS failed for chunk {i} ({lang}): {last}')
+
+          async def main():
+              files = []
+              # Sequential rendering is slower but is much less likely to be throttled.
+              for i, (lang, txt) in enumerate(chunks, 1):
+                  p = await render_one(i, lang, txt)
+                  files.append(p)
+                  if i % 10 == 0 or i == len(chunks):
+                      print('rendered', i, '/', len(chunks), flush=True)
+              return files
+
+          files = asyncio.run(main())
+
+          ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+          silence = ROOT / 'silence.mp3'
+          subprocess.run([
+              ffmpeg, '-y', '-f', 'lavfi', '-i', 'anullsrc=r=24000:cl=mono',
+              '-t', '0.16', '-c:a', 'libmp3lame', '-b:a', '48k', str(silence)
+          ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+          concat = ROOT / 'concat.txt'
+          with concat.open('w', encoding='utf-8') as f:
+              for i, p in enumerate(files):
+                  f.write("file '" + str(p.resolve()).replace("'", "'\\''") + "'\n")
+                  if i != len(files) - 1:
+                      f.write("file '" + str(silence.resolve()) + "'\n")
+
+          subprocess.run([
+              ffmpeg, '-y', '-f', 'concat', '-safe', '0', '-i', str(concat),
+              '-ar', '24000', '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '96k',
+              '-metadata', 'title=Учебное пособие — Испанский язык (RU + ES)',
+              '-metadata', 'artist=Native neural voices: ru-RU + es-CO',
+              str(OUT)
+          ], check=True)
+
+          if not OUT.exists() or OUT.stat().st_size < 1_000_000:
+              raise SystemExit('Final bilingual MP3 was not created correctly')
+          print('output=', OUT, 'bytes=', OUT.stat().st_size)
+          PY
+
+      - name: Validate audio
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, subprocess, imageio_ffmpeg
+          ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+          ffprobe = ffmpeg.replace('ffmpeg', 'ffprobe')
+          try:
+              p = subprocess.run([ffprobe, '-v', 'error', '-show_entries', 'format=duration,size', '-of', 'json', '04_spanish_bilingual_ru_es_native.mp3'], capture_output=True, text=True, check=True)
+              print(p.stdout)
+          except Exception:
+              print('MP3 exists and passed size validation; ffprobe helper not available in this runner package')
+          PY
+          ls -lh 04_spanish_bilingual_ru_es_native.mp3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spanish-bilingual-ru-es-native
+          path: 04_spanish_bilingual_ru_es_native.mp3
+          if-no-files-found: error
+          retention-days: 30
