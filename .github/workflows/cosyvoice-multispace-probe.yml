@@ -1,0 +1,44 @@
+name: CosyVoice multispace probe
+
+on:
+  push:
+    branches: [audio/pdf-native-full-20260814]
+    paths: ['.github/workflows/cosyvoice-multispace-probe.yml']
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -q requests
+      - name: Probe configurations
+        run: |
+          python - <<'PY'
+          import requests,json
+          spaces=[
+            'https://recentechstudio-cosyvoice3.hf.space',
+            'https://multimodalart-fun-cosyvoice3-0-5b-zerogpu.hf.space',
+            'https://hugging-apps-wordvoice-tts.hf.space',
+            'https://thorsten-voice-cosyvoice.hf.space',
+          ]
+          for base in spaces:
+              print('\n###',base)
+              try:
+                  r=requests.get(base+'/config',timeout=30)
+                  print('status',r.status_code,'len',len(r.text))
+                  if r.status_code!=200: print(r.text[:500]); continue
+                  j=r.json(); print('title',j.get('title'),'version',j.get('version'))
+                  comps={c['id']:c for c in j.get('components',[])}
+                  for d in j.get('dependencies',[]):
+                      if d.get('api_name'):
+                          print('API',json.dumps({k:d.get(k) for k in ['api_name','inputs','outputs','queue','show_api']},ensure_ascii=False))
+                          for i in d.get('inputs',[]):
+                              c=comps.get(i,{})
+                              print(' IN',i,c.get('type'),json.dumps(c.get('props',{}),ensure_ascii=False)[:800])
+              except Exception as e: print('ERROR',repr(e))
+          PY
