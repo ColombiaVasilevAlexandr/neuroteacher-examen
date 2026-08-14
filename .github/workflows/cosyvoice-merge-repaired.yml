@@ -1,0 +1,106 @@
+name: CosyVoice3 merge repaired audiobook
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [audio/pdf-native-full-20260814]
+    paths:
+      - '.github/workflows/cosyvoice-merge-repaired.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ColombiaVasilevAlexandr/neuroteacher-examen
+      BASE_RUN: '31794117855'
+      REPAIR_RUN: '31805893717'
+    steps:
+      - name: Wait until required shard artifacts exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=0
+          for i in $(seq 1 330); do
+            base_count=$(gh api "repos/$REPO/actions/runs/$BASE_RUN/artifacts?per_page=100" --jq '[.artifacts[].name | select(startswith("cosy-shard-"))] | unique | length')
+            r14=$(gh api "repos/$REPO/actions/runs/$REPAIR_RUN/artifacts?per_page=100" --jq 'any(.artifacts[]; .name == "cosy-shard-14")')
+            r17=$(gh api "repos/$REPO/actions/runs/$REPAIR_RUN/artifacts?per_page=100" --jq 'any(.artifacts[]; .name == "cosy-shard-17")')
+            echo "poll=$i base_count=$base_count repair14=$r14 repair17=$r17"
+            if [ "$base_count" -ge 18 ] && [ "$r14" = "true" ] && [ "$r17" = "true" ]; then
+              ready=1
+              break
+            fi
+            sleep 60
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Required artifacts did not become available"
+            gh api "repos/$REPO/actions/runs/$BASE_RUN/artifacts?per_page=100" --jq '.artifacts[].name' || true
+            gh api "repos/$REPO/actions/runs/$REPAIR_RUN/artifacts?per_page=100" --jq '.artifacts[].name' || true
+            exit 1
+          fi
+      - name: Download original successful shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cosy-shard-*
+          path: /tmp/base
+          merge-multiple: true
+          repository: ColombiaVasilevAlexandr/neuroteacher-examen
+          run-id: 31794117855
+          github-token: ${{ github.token }}
+      - name: Download repaired 14 and 17
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cosy-shard-*
+          path: /tmp/repair
+          merge-multiple: true
+          repository: ColombiaVasilevAlexandr/neuroteacher-examen
+          run-id: 31805893717
+          github-token: ${{ github.token }}
+      - name: Replace repaired shards and verify set
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -f /tmp/repair/shard_14.mp3 /tmp/base/shard_14.mp3
+          cp -f /tmp/repair/shard_17.mp3 /tmp/base/shard_17.mp3
+          count=$(find /tmp/base -maxdepth 1 -type f -name 'shard_*.mp3' | wc -l)
+          echo "shard_count=$count"
+          find /tmp/base -maxdepth 1 -type f -name 'shard_*.mp3' -printf '%f %s\n' | sort -V
+          test "$count" -eq 20
+      - name: Merge and validate full MP3
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > /tmp/concat.txt
+          find /tmp/base -maxdepth 1 -type f -name 'shard_*.mp3' | sort -V | while read -r f; do
+            printf "file '%s'\n" "$f" >> /tmp/concat.txt
+          done
+          ffmpeg -y -loglevel error -f concat -safe 0 -i /tmp/concat.txt \
+            -ar 24000 -ac 1 -c:a libmp3lame -b:a 64k \
+            -metadata title='Учебное пособие по гражданству Колумбии — CosyVoice3' \
+            -metadata artist='CosyVoice3 male narration' \
+            /tmp/uchebnoe_posobie_kolumbiya_CosyVoice_male_slow_full.mp3
+          python - <<'PY'
+          import json, subprocess
+          p='/tmp/uchebnoe_posobie_kolumbiya_CosyVoice_male_slow_full.mp3'
+          r=subprocess.run(['ffprobe','-v','error','-show_entries','format=duration,size,bit_rate','-of','json',p],capture_output=True,text=True,check=True)
+          m=json.loads(r.stdout)['format']
+          duration=float(m['duration'])
+          size=int(m['size'])
+          print(json.dumps(m, indent=2))
+          if duration < 10000:
+              raise SystemExit(f'duration too short: {duration}')
+          if size < 20000000:
+              raise SystemExit(f'file too small: {size}')
+          print('FULL_VALIDATED hours=', duration/3600, 'bytes=', size)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cosyvoice-full-book-final-repaired
+          path: /tmp/uchebnoe_posobie_kolumbiya_CosyVoice_male_slow_full.mp3
+          if-no-files-found: error
+          retention-days: 30
