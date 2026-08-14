@@ -1,0 +1,30 @@
+name: CosyVoice alternate server config
+
+on:
+  push:
+    branches: [audio/pdf-native-full-20260814]
+    paths: ['.github/workflows/cosyvoice-altserver-config.yml']
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Read Gradio config
+        run: |
+          python - <<'PY'
+          import requests, json
+          u='https://originalmmd-cosyvoice3-voicestudio.hf.space/config'
+          r=requests.get(u,timeout=30)
+          print('status',r.status_code,'len',len(r.text))
+          r.raise_for_status()
+          j=r.json()
+          print('version',j.get('version'))
+          for d in j.get('dependencies',[]):
+              if d.get('api_name') or d.get('backend_fn'):
+                  print(json.dumps({k:d.get(k) for k in ['id','api_name','backend_fn','inputs','outputs','queue']},ensure_ascii=False))
+          PY
