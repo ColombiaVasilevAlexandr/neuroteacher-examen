@@ -21,12 +21,12 @@ jobs:
           python - <<'PY'
           import requests, json
           u='https://originalmmd-cosyvoice3-voicestudio.hf.space/config'
-          r=requests.get(u,timeout=30)
-          print('status',r.status_code,'len',len(r.text))
-          r.raise_for_status()
-          j=r.json()
-          print('version',j.get('version'))
+          r=requests.get(u,timeout=30); print('status',r.status_code,'len',len(r.text)); r.raise_for_status(); j=r.json()
+          comps={c['id']:c for c in j.get('components',[])}
+          for cid in [5,6,7,8,9,11,15,16,17,18,20]:
+              c=comps.get(cid,{})
+              print('COMP',cid,json.dumps({'type':c.get('type'),'props':c.get('props'),'api_info':c.get('api_info')},ensure_ascii=False)[:12000])
           for d in j.get('dependencies',[]):
-              if d.get('api_name') or d.get('backend_fn'):
-                  print(json.dumps({k:d.get(k) for k in ['id','api_name','backend_fn','inputs','outputs','queue']},ensure_ascii=False))
+              if d.get('api_name'):
+                  print('DEP',json.dumps({k:d.get(k) for k in ['id','api_name','inputs','outputs','queue','show_api']},ensure_ascii=False))
           PY
