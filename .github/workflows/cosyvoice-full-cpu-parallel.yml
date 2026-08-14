@@ -70,6 +70,21 @@ jobs:
         with:
           name: cosy-render-plan
           path: /tmp/plan
+      - name: Bypass WeText for pre-cleaned PDF narration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/cosy_full_parallel.py')
+          s=p.read_text(encoding='utf-8')
+          old="for item in model.inference_zero_shot(txt, full, ref, zero_shot_spk_id=sid, stream=False, speed=0.92):"
+          new="for item in model.inference_zero_shot(txt, full, ref, zero_shot_spk_id=sid, stream=False, speed=0.92, text_frontend=False):"
+          if old not in s:
+              raise SystemExit('CosyVoice inference call not found')
+          p.write_text(s.replace(old,new),encoding='utf-8')
+          print('WeText bypass enabled for already-cleaned Russian and Spanish text')
+          PY
       - name: Install system tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq sox libsox-dev ffmpeg
       - name: Clone official CosyVoice
