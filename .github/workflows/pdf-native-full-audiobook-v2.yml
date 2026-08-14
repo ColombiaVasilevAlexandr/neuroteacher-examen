@@ -1,0 +1,62 @@
+name: PDF native RU-ES full audiobook v2
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - audio/pdf-native-full-20260814
+    paths:
+      - '.pdf-native-audio-v2-trigger'
+      - '.github/workflows/pdf-native-full-audiobook-v2.yml'
+      - 'scripts/build_pdf_audio.py'
+      - 'pdf_payload_v2/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install neural TTS tools
+        run: pip install -q edge-tts imageio-ffmpeg
+      - name: Restore exact PDF-extracted text
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip
+          src=Path('pdf_payload_v2'); out=Path('/tmp/pdf_audio_texts'); out.mkdir(parents=True,exist_ok=True)
+          mins={'01_geography':18000,'02_history':60000,'03_constitution':47000,'04_spanish_bilingual':60000}
+          for name,minimum in mins.items():
+              parts=sorted(src.glob(f'{name}.gz.b64.part*'))
+              if parts:
+                  payload=''.join(p.read_text(encoding='ascii').strip() for p in parts)
+                  print(name,'using_parts=',len(parts),'payload_chars=',len(payload))
+              else:
+                  payload=(src/f'{name}.gz.b64').read_text(encoding='ascii').strip()
+                  print(name,'using_single payload_chars=',len(payload))
+              text=gzip.decompress(base64.b64decode(payload)).decode('utf-8')
+              if len(text)<minimum: raise SystemExit(f'{name}: too short {len(text)}')
+              (out/f'{name}.txt').write_text(text,encoding='utf-8')
+              print(name,'chars=',len(text),'bytes=',len(text.encode('utf-8')))
+          PY
+      - name: Render audiobook
+        run: python scripts/build_pdf_audio.py
+      - name: Validate
+        run: |
+          test -s uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3
+          test $(stat -c%s uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3) -gt 20000000
+          ls -lh uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-audiobook-pdf-native-ru-es-v2
+          path: uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3
+          if-no-files-found: error
+          retention-days: 30
