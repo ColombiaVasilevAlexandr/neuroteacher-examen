@@ -1,0 +1,60 @@
+name: CosyVoice alternate server generate probe
+
+on:
+  push:
+    branches: [audio/pdf-native-full-20260814]
+    paths: ['.github/workflows/cosyvoice-altserver-generate-probe.yml']
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install clients
+        run: pip install -q gradio_client edge-tts imageio-ffmpeg
+      - name: Generate CosyVoice test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import asyncio, os, json, shutil, subprocess
+          import edge_tts
+          import gradio_client.utils as gu
+          from gradio_client import Client, handle_file
+          import imageio_ffmpeg
+
+          # Gradio 5.0 server exposes a JSON schema with boolean additionalProperties.
+          # Newer gradio_client versions choke on it while decoding /info; tolerate it.
+          _orig = gu._json_schema_to_python_type
+          def _patched(schema, defs=None):
+              if isinstance(schema, bool):
+                  return 'Any'
+              return _orig(schema, defs)
+          gu._json_schema_to_python_type = _patched
+
+          prompt='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+          async def make_ref():
+              await edge_tts.Communicate(prompt, 'ru-RU-DmitryNeural', rate='-8%').save('/tmp/ref.mp3')
+          asyncio.run(make_ref())
+
+          c=Client('https://originalmmd-cosyvoice3-voicestudio.hf.space/', verbose=True)
+          print(c.view_api())
+          text='Колумбия расположена на северо-западе Южной Америки. Столица страны — Богота.'
+          result=c.predict(text, prompt, handle_file('/tmp/ref.mp3'), 1.0, 424242, api_name='/zero_shot')
+          print('RESULT=',result)
+          src=result[0] if isinstance(result,(tuple,list)) else result
+          if isinstance(src,dict): src=src.get('path') or src.get('name')
+          if not src or not os.path.exists(src): raise RuntimeError(f'No audio path: {result!r}')
+          ffmpeg=imageio_ffmpeg.get_ffmpeg_exe()
+          subprocess.run([ffmpeg,'-y','-i',src,'-filter:a','atempo=0.92','-c:a','libmp3lame','-b:a','128k','/tmp/cosy_alt_probe.mp3'],check=True)
+          print('bytes=',os.path.getsize('/tmp/cosy_alt_probe.mp3'))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cosy-altserver-probe
+          path: /tmp/cosy_alt_probe.mp3
+          if-no-files-found: error
