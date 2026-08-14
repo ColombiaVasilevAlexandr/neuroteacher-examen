@@ -1,0 +1,79 @@
+name: PDF native RU-ES full audiobook v5 direct text
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - audio/pdf-native-full-20260814
+    paths:
+      - '.pdf-native-audio-v5-trigger'
+      - '.github/workflows/pdf-native-full-audiobook-v5.yml'
+      - 'scripts/build_pdf_audio.py'
+      - 'pdf_text_direct/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install neural TTS tools
+        run: pip install -q edge-tts imageio-ffmpeg
+      - name: Prepare exact PDF-extracted text
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pdf_audio_texts
+          cp pdf_text_direct/01_geography.txt /tmp/pdf_audio_texts/01_geography.txt
+          cp pdf_text_direct/02_history.txt /tmp/pdf_audio_texts/02_history.txt
+          cp pdf_text_direct/03_constitution.txt /tmp/pdf_audio_texts/03_constitution.txt
+          cp pdf_text_direct/04_spanish_bilingual.txt /tmp/pdf_audio_texts/04_spanish_bilingual.txt
+          python - <<'PY'
+          from pathlib import Path
+          mins={'01_geography':18000,'02_history':60000,'03_constitution':47000,'04_spanish_bilingual':60000}
+          root=Path('/tmp/pdf_audio_texts')
+          for n,m in mins.items():
+              t=(root/(n+'.txt')).read_text(encoding='utf-8')
+              print(n,'chars=',len(t),'bytes=',len(t.encode('utf-8')),flush=True)
+              if len(t)<m: raise SystemExit(f'{n}: too short {len(t)}')
+          PY
+      - name: Render full MP3 with native RU and Colombian ES voices
+        run: python scripts/build_pdf_audio.py
+      - name: Validate and split final MP3
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3
+          test -s "$FILE"
+          test $(stat -c%s "$FILE") -gt 20000000
+          rm -rf generated_audio
+          mkdir generated_audio
+          split -b 15M -d -a 3 "$FILE" generated_audio/final_mp3.part-
+          sha256sum "$FILE" | tee generated_audio/sha256.txt
+          stat -c 'bytes=%s' "$FILE" | tee generated_audio/size.txt
+          printf '%s\n' generated_audio/final_mp3.part-* > generated_audio/parts.txt
+          ls -lh "$FILE" generated_audio/
+      - name: Publish chunks to temporary branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add generated_audio
+          git commit -m 'chore(audio): publish final PDF RU-ES MP3 chunks' || true
+          git pull --rebase origin audio/pdf-native-full-20260814
+          git push origin HEAD:audio/pdf-native-full-20260814
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-audiobook-pdf-native-ru-es-v5
+          path: uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3
+          if-no-files-found: error
+          retention-days: 30
