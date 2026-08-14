@@ -1,0 +1,72 @@
+name: CosyVoice local CPU probe
+
+on:
+  push:
+    branches: [audio/pdf-native-full-20260814]
+    paths: ['.github/workflows/cosyvoice-local-cpu-probe.yml']
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: System tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sox libsox-dev ffmpeg
+      - name: Clone CosyVoice
+        run: git clone --depth 1 --recursive https://github.com/QwenAudio/CosyVoice.git /tmp/CosyVoice
+      - name: Install CPU dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -q --upgrade pip
+          pip install -q torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+          cd /tmp/CosyVoice
+          grep -vE '^(--extra-index-url|deepspeed|onnxruntime-gpu|tensorrt-cu12)' requirements.txt > /tmp/cosy-req.txt
+          pip install -q -r /tmp/cosy-req.txt
+          pip install -q onnxruntime==1.18.0 huggingface_hub edge-tts
+      - name: Download CosyVoice3 model
+        run: |
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+          p=snapshot_download('FunAudioLLM/Fun-CosyVoice3-0.5B-2512',local_dir='/tmp/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B')
+          print(p)
+          PY
+      - name: Generate approved-style Russian sample locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/CosyVoice
+          python - <<'PY'
+          import asyncio, subprocess, time, os, sys
+          sys.path.append('third_party/Matcha-TTS')
+          import edge_tts, torchaudio
+          from cosyvoice.cli.cosyvoice import AutoModel
+
+          prompt='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+          async def ref():
+              await edge_tts.Communicate(prompt,'ru-RU-DmitryNeural',rate='-8%').save('/tmp/ref.mp3')
+          asyncio.run(ref())
+          subprocess.run(['ffmpeg','-y','-loglevel','error','-i','/tmp/ref.mp3','-ar','24000','-ac','1','/tmp/ref.wav'],check=True)
+
+          t0=time.time()
+          model=AutoModel(model_dir='pretrained_models/Fun-CosyVoice3-0.5B',load_trt=False,load_vllm=False,fp16=False)
+          print('MODEL_LOAD_SEC',time.time()-t0,flush=True)
+          text='Колумбия расположена на северо-западе Южной Америки. Столица страны — Богота.'
+          t1=time.time(); outs=[]
+          for x in model.inference_zero_shot(text,'You are a helpful assistant.<|endofprompt|>'+prompt,'/tmp/ref.wav',stream=False,speed=0.92):
+              outs.append(x['tts_speech'])
+          audio=__import__('torch').concat(outs,dim=1)
+          torchaudio.save('/tmp/cosy_local_probe.wav',audio,model.sample_rate)
+          print('INFER_SEC',time.time()-t1,'AUDIO_SEC',audio.shape[1]/model.sample_rate,'BYTES',os.path.getsize('/tmp/cosy_local_probe.wav'),flush=True)
+          PY
+          ffmpeg -y -loglevel error -i /tmp/cosy_local_probe.wav -c:a libmp3lame -b:a 128k /tmp/cosy_local_probe.mp3
+          ls -lh /tmp/cosy_local_probe.mp3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cosyvoice-local-cpu-probe
+          path: /tmp/cosy_local_probe.mp3
+          if-no-files-found: error
