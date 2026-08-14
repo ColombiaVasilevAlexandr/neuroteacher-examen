@@ -1,0 +1,26 @@
+name: CosyVoice HF auth probe
+
+on:
+  push:
+    branches: [audio/cosyvoice-full-20260813]
+    paths: ['.github/workflows/cosyvoice-hf-auth-probe.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Hugging Face token presence without disclosure
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -n "${HF_TOKEN:-}" || test -n "${HUGGINGFACE_TOKEN:-}"; then
+            echo "HF_AUTH_CONFIGURED=true"
+          else
+            echo "HF_AUTH_CONFIGURED=false"
+          fi
