@@ -1,0 +1,95 @@
+name: PDF native RU-ES full audiobook v4
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - audio/pdf-native-full-20260814
+    paths:
+      - '.pdf-native-audio-v4-trigger'
+      - '.github/workflows/pdf-native-full-audiobook-v4.yml'
+      - 'scripts/build_pdf_audio.py'
+      - 'pdf_payload_v2/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install neural TTS tools
+        run: pip install -q edge-tts imageio-ffmpeg
+      - name: Restore exact text extracted from PDF
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip
+          src=Path('pdf_payload_v2'); out=Path('/tmp/pdf_audio_texts'); out.mkdir(parents=True,exist_ok=True)
+          specs={
+            '01_geography': {'min':18000,'encoded':None},
+            '02_history': {'min':60000,'encoded':42064},
+            '03_constitution': {'min':47000,'encoded':27792},
+            '04_spanish_bilingual': {'min':60000,'encoded':39336},
+          }
+          for name,spec in specs.items():
+              parts=sorted(src.glob(f'{name}.gz.b64.part*'))
+              payload=''.join(p.read_text(encoding='ascii').strip() for p in parts)
+              single=src/f'{name}.gz.b64'
+              if spec['encoded'] is None:
+                  if not payload: payload=single.read_text(encoding='ascii').strip()
+              else:
+                  need=spec['encoded']-len(payload)
+                  if need>0:
+                      fullish=single.read_text(encoding='ascii').strip()
+                      if len(fullish)<need: raise SystemExit(f'{name}: fallback too short, need {need}')
+                      payload += fullish[-need:]
+                  if len(payload)!=spec['encoded']:
+                      raise SystemExit(f'{name}: encoded length {len(payload)} != {spec["encoded"]}')
+              raw=base64.b64decode(payload,validate=True)
+              text=gzip.decompress(raw).decode('utf-8')
+              if len(text)<spec['min']: raise SystemExit(f'{name}: restored text too short {len(text)}')
+              (out/f'{name}.txt').write_text(text,encoding='utf-8')
+              print(name,'parts=',len(parts),'encoded=',len(payload),'chars=',len(text),'bytes=',len(text.encode('utf-8')),flush=True)
+          PY
+      - name: Render full MP3
+        run: python scripts/build_pdf_audio.py
+      - name: Validate and split for direct retrieval
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3
+          test -s "$FILE"
+          test $(stat -c%s "$FILE") -gt 20000000
+          rm -rf generated_audio
+          mkdir generated_audio
+          split -b 15M -d -a 3 "$FILE" generated_audio/final_mp3.part-
+          sha256sum "$FILE" | tee generated_audio/sha256.txt
+          stat -c 'bytes=%s' "$FILE" | tee generated_audio/size.txt
+          printf '%s\n' generated_audio/final_mp3.part-* > generated_audio/parts.txt
+          ls -lh "$FILE" generated_audio/
+      - name: Commit generated MP3 chunks to temporary branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add generated_audio
+          git commit -m 'chore(audio): publish generated RU-ES audiobook chunks' || true
+          git pull --rebase origin audio/pdf-native-full-20260814
+          git push origin HEAD:audio/pdf-native-full-20260814
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-audiobook-pdf-native-ru-es-v4
+          path: uchebnoe_posobie_kolumbiya_RU_ES_native_full.mp3
+          if-no-files-found: error
+          retention-days: 30
