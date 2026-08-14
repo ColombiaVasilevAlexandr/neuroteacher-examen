@@ -1,0 +1,94 @@
+name: CosyVoice direct API probe
+
+on:
+  push:
+    branches: [audio/pdf-native-full-20260814]
+    paths: ['.github/workflows/cosyvoice-direct-api-probe.yml']
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install clients
+        run: pip install -q requests edge-tts imageio-ffmpeg
+      - name: Generate via direct Gradio call API
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import asyncio, json, mimetypes, os, subprocess, time
+          from pathlib import Path
+          import requests, edge_tts, imageio_ffmpeg
+
+          BASE='https://originalmmd-cosyvoice3-voicestudio.hf.space'
+          prompt='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+          text='Колумбия расположена на северо-западе Южной Америки. Столица страны — Богота.'
+
+          async def ref():
+              await edge_tts.Communicate(prompt,'ru-RU-DmitryNeural',rate='-8%').save('/tmp/ref.mp3')
+          asyncio.run(ref())
+
+          s=requests.Session()
+          with open('/tmp/ref.mp3','rb') as fh:
+              r=s.post(BASE+'/gradio_api/upload',files={'files':('ref.mp3',fh,'audio/mpeg')},timeout=120)
+          print('upload',r.status_code,r.text[:1000])
+          r.raise_for_status()
+          up=r.json()
+          path=up[0] if isinstance(up,list) else up.get('files',[None])[0] if isinstance(up,dict) else None
+          if isinstance(path,dict): path=path.get('path') or path.get('name')
+          if not path: raise RuntimeError(f'Unexpected upload response: {up!r}')
+          fd={'path':path,'url':None,'size':os.path.getsize('/tmp/ref.mp3'),'orig_name':'ref.mp3','mime_type':'audio/mpeg','is_stream':False,'meta':{'_type':'gradio.FileData'}}
+
+          payload={'data':[text,prompt,fd,1.0,424242]}
+          r=s.post(BASE+'/gradio_api/call/zero_shot',json=payload,timeout=120)
+          print('call',r.status_code,r.text[:1000])
+          r.raise_for_status()
+          ev=r.json().get('event_id')
+          if not ev: raise RuntimeError(f'No event_id: {r.text}')
+
+          with s.get(BASE+f'/gradio_api/call/zero_shot/{ev}',stream=True,timeout=1200) as resp:
+              print('stream_status',resp.status_code)
+              resp.raise_for_status()
+              final=None
+              for raw in resp.iter_lines(decode_unicode=True):
+                  if raw is None: continue
+                  line=raw.strip()
+                  if line: print('SSE',line[:2000])
+                  if line.startswith('data:'):
+                      try:
+                          obj=json.loads(line[5:].strip())
+                          if isinstance(obj,list) and obj:
+                              final=obj
+                      except Exception:
+                          pass
+          if not final: raise RuntimeError('No final data received')
+          out=final[0]
+          if isinstance(out,dict):
+              url=out.get('url')
+              opath=out.get('path') or out.get('name')
+          else:
+              url=None; opath=out
+          print('FINALOBJ',out)
+          if url:
+              rr=s.get(url,timeout=300); rr.raise_for_status(); Path('/tmp/out.wav').write_bytes(rr.content)
+          elif opath:
+              # Gradio files are served via /gradio_api/file=<path>
+              furl=BASE+'/gradio_api/file='+opath
+              rr=s.get(furl,timeout=300); print('file_get',rr.status_code,furl); rr.raise_for_status(); Path('/tmp/out.wav').write_bytes(rr.content)
+          else:
+              raise RuntimeError(f'No output file in {out!r}')
+
+          ffmpeg=imageio_ffmpeg.get_ffmpeg_exe()
+          subprocess.run([ffmpeg,'-y','-i','/tmp/out.wav','-filter:a','atempo=0.92','-c:a','libmp3lame','-b:a','128k','/tmp/cosy_direct_probe.mp3'],check=True)
+          print('PROBE_BYTES',os.path.getsize('/tmp/cosy_direct_probe.mp3'))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cosy-direct-api-probe
+          path: /tmp/cosy_direct_probe.mp3
+          if-no-files-found: error
