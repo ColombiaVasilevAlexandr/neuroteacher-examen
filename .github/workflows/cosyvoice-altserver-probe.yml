@@ -1,0 +1,40 @@
+name: CosyVoice alternate server probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [audio/pdf-native-full-20260814]
+    paths:
+      - '.github/workflows/cosyvoice-altserver-probe.yml'
+      - '.cosy-alt-probe-trigger'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install client
+        run: pip install -q gradio_client edge-tts
+      - name: Inspect API and synthesize tiny sample
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import asyncio, os
+          import edge_tts
+          from gradio_client import Client, handle_file
+
+          async def ref():
+              text='Добрый день. Это спокойный мужской голос для учебной аудиокниги о Колумбии.'
+              await edge_tts.Communicate(text, 'ru-RU-DmitryNeural', rate='-8%').save('/tmp/ref.mp3')
+          asyncio.run(ref())
+
+          url='https://originalmmd-cosyvoice3-voicestudio.hf.space/'
+          c=Client(url, verbose=True)
+          print('=== API ===')
+          print(c.view_api(return_format='dict'))
+          print('=== END API ===')
+          PY
