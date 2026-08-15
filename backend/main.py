@@ -249,8 +249,8 @@ def dashboard():
         calendar = []
         for days_ago in range(29, -1, -1):
             day = today - timedelta(days=days_ago)
-            row = db.execute("SELECT COUNT(*) FROM attempts WHERE date(created_at,'localtime') = ?", (day.isoformat(),)).fetchone()
-            calendar.append({"date": day.isoformat(), "attempts": row[0]})
+            row = db.execute("SELECT COUNT(*), COALESCE(SUM(correct),0) FROM attempts WHERE date(created_at,'localtime') = ?", (day.isoformat(),)).fetchone()
+            calendar.append({"date": day.isoformat(), "attempts": row[0], "score": round(row[1] / row[0] * 100) if row[0] else None})
     streak = 0
     cursor = date.today()
     while cursor in active_days:

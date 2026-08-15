@@ -26,6 +26,23 @@
         item.innerHTML = `<b>${label}</b><i title="${attempts} занятий">${attempts > 0 ? '✓' : '·'}</i>`
         return item
       }))
+      const chart = document.querySelector('.preparation .chart')
+      if (chart) {
+        const points = dashboard.calendar.map(({ score }, index) => {
+          const x = 14 + index * 302 / Math.max(1, dashboard.calendar.length - 1)
+          const y = score === null ? 78 : 78 - score * .7
+          return `${x},${y}`
+        }).join(' ')
+        const labels = dashboard.calendar.filter((_, index) => index % 5 === 0 || index === dashboard.calendar.length - 1)
+          .map(({ date }) => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(`${date}T12:00:00`)))
+          .map(label => `<span>${label}</span>`).join('')
+        chart.querySelector('svg').innerHTML = `<polyline points="${points}"></polyline>` + dashboard.calendar.map(({ score }, index) => {
+          const x = 14 + index * 302 / Math.max(1, dashboard.calendar.length - 1)
+          const y = score === null ? 78 : 78 - score * .7
+          return `<circle cx="${x}" cy="${y}" r="${score === null ? 2 : 4}"></circle>`
+        }).join('')
+        chart.querySelector('.chart-labels').innerHTML = labels
+      }
     } catch (_) {
       // The original five-day calendar stays visible if the API is unavailable.
     }
