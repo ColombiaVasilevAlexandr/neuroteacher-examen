@@ -246,6 +246,11 @@ def dashboard():
             day = today - timedelta(days=days_ago)
             row = db.execute("SELECT COUNT(*), COALESCE(SUM(correct),0) FROM attempts WHERE date(created_at,'localtime') = ?", (day.isoformat(),)).fetchone()
             trend.append({"date": day.isoformat(), "score": round(row[1] / row[0] * 100) if row[0] else None, "attempts": row[0]})
+        calendar = []
+        for days_ago in range(29, -1, -1):
+            day = today - timedelta(days=days_ago)
+            row = db.execute("SELECT COUNT(*) FROM attempts WHERE date(created_at,'localtime') = ?", (day.isoformat(),)).fetchone()
+            calendar.append({"date": day.isoformat(), "attempts": row[0]})
     streak = 0
     cursor = date.today()
     while cursor in active_days:
@@ -255,7 +260,7 @@ def dashboard():
         "attempts": total, "correct": correct,
         "score": round(correct / total * 100) if total else 0,
         "streak": streak, "exams": exams, "average_time_seconds": round(average_time, 1) if average_time is not None else None,
-        "recent_activity": recent, "trend": trend,
+        "recent_activity": recent, "trend": trend, "calendar": calendar,
         "topic_counts": topic_counts, "due_reviews": due_reviews,
     }
 
