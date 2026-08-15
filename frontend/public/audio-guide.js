@@ -31,8 +31,8 @@
       </div>
       <div class="audio-guide__content">
         <span class="audio-guide__number">1</span>
-        <div><p>Проверка русской озвучки</p><small>Прослушайте фрагмент. После этого отметьте урок как пройденный.</small></div>
-        <audio controls preload="metadata" src="/audio/cosyvoice-ru-test.mp3" aria-label="Русская озвучка методички"></audio>
+        <div><p>Проверка русской озвучки · Дмитрий</p><small>Прослушайте фрагмент. После этого отметьте урок как пройденный.</small></div>
+        <audio controls preload="metadata" src="/audio/dmitry-ru-test.mp3" aria-label="Мужская русская озвучка методички"></audio>
         <button class="audio-guide__complete" type="button">${completed ? '✓ Прослушано' : 'Отметить'}</button>
       </div>`
     quick.before(card)
