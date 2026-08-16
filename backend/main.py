@@ -141,12 +141,15 @@ async def consultant_speech(payload: SpeechRequest):
         raise HTTPException(502, "Speech service is unavailable")
 
 @app.get('/api/questions')
-def questions(limit: int = 20, topic: str | None = None):
+def questions(limit: int = 20, topic: str | None = None, exclude: str | None = None):
+    excluded_ids = [int(value) for value in (exclude or '').split(',') if value.strip().isdigit()]
+    excluded_sql = f" AND id NOT IN ({','.join('?' for _ in excluded_ids)})" if excluded_ids else ''
+    filters = "status IN ('reviewed','verified','ai_reviewed')" + excluded_sql
     with conn() as db:
         if topic:
-            rows = db.execute("SELECT id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page FROM questions WHERE status IN ('reviewed','verified','ai_reviewed') AND topic=? ORDER BY RANDOM() LIMIT ?", (topic, limit)).fetchall()
+            rows = db.execute(f"SELECT id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page FROM questions WHERE {filters} AND topic=? ORDER BY RANDOM() LIMIT ?", (*excluded_ids, topic, limit)).fetchall()
         else:
-            rows = db.execute("SELECT id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page FROM questions WHERE status IN ('reviewed','verified','ai_reviewed') ORDER BY RANDOM() LIMIT ?", (limit,)).fetchall()
+            rows = db.execute(f"SELECT id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page FROM questions WHERE {filters} ORDER BY RANDOM() LIMIT ?", (*excluded_ids, limit)).fetchall()
     return [dict(r) for r in rows]
 
 @app.get('/api/exams/formats')
