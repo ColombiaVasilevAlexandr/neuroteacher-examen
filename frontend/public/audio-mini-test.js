@@ -12,10 +12,21 @@
       button.disabled = true; button.textContent = 'Загрузка…'
       let questions
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/questions?limit=5&topic=${encodeURIComponent(topic)}`)
+        const seenKey = `colombia-exam-mini-test-seen-${topic}`
+        let seen = JSON.parse(localStorage.getItem(seenKey) || '[]').filter(Number.isInteger)
+        const load = async () => fetch(`http://127.0.0.1:8000/api/questions?limit=5&topic=${encodeURIComponent(topic)}&exclude=${seen.join(',')}`)
+        let response = await load()
         if (!response.ok) throw new Error('Не удалось получить вопросы')
         questions = await response.json()
+        if (!questions.length && seen.length) {
+          seen = []
+          response = await load()
+          if (!response.ok) throw new Error('Не удалось получить вопросы')
+          questions = await response.json()
+        }
         if (!Array.isArray(questions) || !questions.length) throw new Error('Для этого раздела пока нет вопросов')
+        seen = [...new Set([...seen, ...questions.map(question => question.id)])]
+        localStorage.setItem(seenKey, JSON.stringify(seen))
       } catch (error) {
         alert(error.message || 'Мини-тест не удалось открыть. Попробуйте ещё раз.')
         button.disabled = false; button.textContent = 'Мини-тест: 5 вопросов'
