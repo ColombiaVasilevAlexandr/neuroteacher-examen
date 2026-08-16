@@ -12,6 +12,7 @@
     .methodology-course__lesson small { color: #8fa2b0; margin-top: 3px; }
     .methodology-course__lesson audio { width: min(300px, 100%); }
     .methodology-course__start { color: #091116; background: #ffd12a; border: 0; border-radius: 8px; padding: 9px 11px; white-space: nowrap; font-size: 12px; font-weight: 700; }
+    .methodology-course__start:disabled { cursor: not-allowed; opacity: .45; }
     @media (max-width: 650px) { .methodology-course__lesson { align-items: stretch; flex-wrap: wrap; } .methodology-course__lesson audio { width: 100%; } }
   `
   document.head.append(style)
@@ -33,6 +34,22 @@
         <article class="methodology-course__lesson"><b>06</b><div><strong>Натурализация</strong><small>Документы, сроки и порядок подачи</small></div><audio controls preload="metadata" src="/audio/lesson-06-naturalization.mp3" aria-label="Урок Натурализация"></audio><button class="methodology-course__start" data-topic="Натурализация">Тренировка</button></article>
       </div>`
     guide.after(course)
+    course.querySelectorAll('.methodology-course__lesson').forEach((lesson, index) => {
+      const audio = lesson.querySelector('audio')
+      const button = lesson.querySelector('.methodology-course__start')
+      const key = `colombia-exam-methodology-lesson-${index + 1}`
+      const unlock = () => {
+        localStorage.setItem(key, 'complete')
+        button.disabled = false
+        button.textContent = 'К тренировке'
+      }
+      if (localStorage.getItem(key) === 'complete') unlock()
+      else {
+        button.disabled = true
+        button.textContent = 'Прослушайте блок'
+        audio.addEventListener('ended', unlock, { once: true })
+      }
+    })
     course.querySelectorAll('.methodology-course__start').forEach(button => button.addEventListener('click', () => {
       const topic = button.dataset.topic
       const topicButton = [...document.querySelectorAll('.plan-item')].find(item => item.textContent.includes(topic))
