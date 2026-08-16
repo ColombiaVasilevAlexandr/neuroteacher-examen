@@ -5,6 +5,8 @@ backend/.venv/
 __pycache__/
 *.pyc
 backend/api.log
+backend/*.out.log
+backend/*.err.log
 backend/check.json
 backend/page4.json
 database/*.before_bank_cleanup.db
