@@ -15,14 +15,18 @@ def main():
     parser.add_argument("--from-page", type=int, required=True)
     parser.add_argument("--to-page", type=int, required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--source-file")
     args = parser.parse_args()
 
-    pages = json.loads(SOURCE.read_text(encoding="utf-8"))["pages"]
-    source = "\n\n".join(
-        f"[Страница {page['page']}]\n{page['text']}"
-        for page in pages
-        if args.from_page <= page["page"] <= args.to_page
-    )
+    if args.source_file:
+        source = (ROOT / args.source_file).read_text(encoding="utf-8")
+    else:
+        pages = json.loads(SOURCE.read_text(encoding="utf-8"))["pages"]
+        source = "\n\n".join(
+            f"[Страница {page['page']}]\n{page['text']}"
+            for page in pages
+            if args.from_page <= page["page"] <= args.to_page
+        )
     prompt = f"""Ты методист для подготовки к экзамену на гражданство Колумбии.
 Подготовь на русском сценарий аудиоурока «{args.title}» объёмом 1500–1800 слов.
 Используй только факты из приведённых ниже страниц официальной методички. Не добавляй
