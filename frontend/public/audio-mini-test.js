@@ -6,13 +6,8 @@
     const topic = topics[start?.dataset.topic]
     if (!topic) return
     const button = document.createElement('button')
-    button.className = 'audio-mini-test'; button.type = 'button'; button.textContent = 'Мини-тест: 5 вопросов'; button.disabled = true
+    button.className = 'audio-mini-test'; button.type = 'button'; button.textContent = 'Мини-тест: 5 вопросов'; button.disabled = false
     button.style.cssText = 'border:1px solid #38e0d0;background:#12344d;border-radius:8px;padding:9px 11px;color:#eef4ff;font-weight:700'
-    const lessonNumber = [...document.querySelectorAll('.methodology-course__lesson')].indexOf(lesson) + 1
-    const completionKey = `colombia-exam-methodology-lesson-${lessonNumber}`
-    const unlock = () => { button.disabled = false; button.textContent = 'Мини-тест: 5 вопросов' }
-    if (localStorage.getItem(completionKey) === 'complete') unlock()
-    else lesson.querySelector('audio').addEventListener('ended', unlock, { once: true })
     button.addEventListener('click', async () => {
       button.disabled = true; button.textContent = 'Загрузка…'
       let questions
