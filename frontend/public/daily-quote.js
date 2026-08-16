@@ -41,8 +41,11 @@
     if (!card) return
     const [text, author] = quoteForToday()
     const paragraph = card.querySelector('p'), source = card.querySelector('small')
-    if (paragraph) paragraph.textContent = text
-    if (source) source.textContent = `— ${author}`
+    // render() is invoked by a MutationObserver. Avoid producing a fresh
+    // mutation when the visible quote has not changed.
+    if (paragraph && paragraph.textContent !== text) paragraph.textContent = text
+    const attribution = `— ${author}`
+    if (source && source.textContent !== attribution) source.textContent = attribution
   }
   new MutationObserver(render).observe(document.documentElement, { childList: true, subtree: true })
   render()
