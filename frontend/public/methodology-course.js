@@ -18,8 +18,8 @@
   document.head.append(style)
 
   const render = () => {
-    const guide = document.querySelector('.audio-guide')
-    if (!guide || document.querySelector('.methodology-course')) return
+    const quick = document.querySelector('.quick')
+    if (!quick || document.querySelector('.methodology-course')) return
     const course = document.createElement('section')
     course.className = 'methodology-course'
     course.innerHTML = `
@@ -33,7 +33,7 @@
         <article class="methodology-course__lesson"><b>05</b><div><strong>Культура Колумбии</strong><small>Полный методический блок · 12 мин. 51 сек.</small></div><audio controls preload="metadata" src="/audio/lesson-05-culture-full.mp3" aria-label="Полный урок Культура Колумбии"></audio><button class="methodology-course__start" data-topic="Культура">Тренировка</button></article>
         <article class="methodology-course__lesson"><b>06</b><div><strong>Натурализация</strong><small>Официальные требования · 12 мин. 53 сек.</small></div><audio controls preload="metadata" src="/audio/lesson-06-naturalization-full.mp3" aria-label="Полный урок Натурализация"></audio><button class="methodology-course__start" data-topic="Натурализация">Тренировка</button></article>
       </div>`
-    guide.after(course)
+    quick.before(course)
     course.querySelectorAll('.methodology-course__lesson').forEach((lesson, index) => {
       const audio = lesson.querySelector('audio')
       const button = lesson.querySelector('.methodology-course__start')
