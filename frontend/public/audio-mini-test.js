@@ -17,7 +17,7 @@
       button.disabled = true; button.textContent = 'Загрузка…'
       let questions
       try {
-        const response = await fetch(`/api/questions?limit=5&topic=${encodeURIComponent(topic)}`)
+        const response = await fetch(`http://127.0.0.1:8000/api/questions?limit=5&topic=${encodeURIComponent(topic)}`)
         if (!response.ok) throw new Error('Не удалось получить вопросы')
         questions = await response.json()
         if (!Array.isArray(questions) || !questions.length) throw new Error('Для этого раздела пока нет вопросов')
