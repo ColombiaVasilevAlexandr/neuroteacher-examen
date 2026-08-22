@@ -209,6 +209,8 @@ Runtime smoke test:
 python scripts\smoke_test.py
 ```
 
+GitHub Actions also runs this contract through `.github/workflows/smoke.yml`.
+
 Expected current facts:
 
 - backend health: `ok`;
