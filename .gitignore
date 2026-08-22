@@ -10,8 +10,16 @@ backend/*.err.log
 backend/check.json
 backend/page4.json
 database/*.before_bank_cleanup.db
+database/*.backup-*.db
 data/imports/
 data/official_sources/*.pdf
+data/*.log
+data/*.out.log
+data/*.err.log
+push-github.log
+*.backup-*
+*.bak
+*.tmp
 
 # Environment files
 .env
@@ -25,3 +33,5 @@ build/
 .DS_Store
 Thumbs.db
 .vscode/
+backend/.venv-broken-*/
+frontend/stable-check.png

@@ -1,22 +1,26 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="google" content="notranslate" />
-    <title>frontend</title>
+    <meta name="neuroteacher-exam-app" content="colombia-exam-static" />
+    <title>COLOMBIA EXAM</title>
   </head>
   <body>
     <div id="root"></div>
     <link rel="stylesheet" href="/app.bundle.css" />
-    <link rel="stylesheet" href="/colombia-brand.css?v=2" />
-    <script type="module" src="/app.bundle.js"></script>
-    <script src="/colombia-brand.js?v=2"></script>
-    <script src="/calendar-history.js?v=1"></script>
-    <script src="/daily-quote.js?v=1"></script>
-    <script src="/methodology-course.js?v=3"></script>
-    <script src="/answer-review-audio.js?v=1"></script>
-    <script src="/audio-mini-test.js?v=4"></script>
+    <script>
+      window.setTimeout(function () {
+        var root = document.getElementById('root');
+        if (!root || root.childElementCount > 0) return;
+        root.innerHTML = '<main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#06101d;color:#eef4ff;font-family:Arial,sans-serif"><section style="width:min(760px,100%);padding:24px;border:1px solid #ff5360;border-radius:12px;background:#0b1a2b"><h1 style="margin:0 0 12px">COLOMBIA EXAM не запустился</h1><p style="color:#c8d3df;line-height:1.5">Основной интерфейс не смонтировал приложение. Перезапустите scripts/start-neuroteacher.ps1.</p></section></main>';
+      }, 2000);
+    </script>
+    <script src="/legacy-app.bundle.js?v=3"></script>
+    <script src="/study-plan.js?v=1" defer></script>
+    <script src="/audio-library.js?v=2" defer></script>
+    <script src="/daily-quote.js?v=1" defer></script>
   </body>
 </html>

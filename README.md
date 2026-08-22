@@ -2,33 +2,23 @@
 
 Локальное веб-приложение для подготовки к экзамену на гражданство Колумбии.
 
-## Что готово
+## Источник истины
 
-- Адаптивный React-интерфейс стартового экрана в тёмной неоновой стилистике.
-- Навигация, план занятия, прогресс, статистика и быстрые действия на моковых данных.
-- Архитектурное направление: React + FastAPI + SQLite; без Docker и локальных моделей на первом этапе.
+Актуальная архитектура, рабочий запуск, список файлов, правила работы с базой и обязательные проверки зафиксированы в [docs/SOURCE_OF_TRUTH.md](docs/SOURCE_OF_TRUTH.md).
 
-## Запуск интерфейса
+## Запуск
 
 ```powershell
-cd frontend
-npm install
-npm run dev
+powershell -ExecutionPolicy Bypass -File scripts\start-neuroteacher.ps1
 ```
 
-Откройте адрес, который покажет Vite (обычно `http://localhost:5173`).
+Приложение открывается на `http://127.0.0.1:5173/`.
 
-## Запуск API и базы
+API доступен на `http://127.0.0.1:8000/api`.
 
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-uvicorn main:app --reload
-```
+Текущий рабочий frontend - static из `frontend/public`. Vite не является основным запуском этого дерева.
 
-API будет доступен по адресу `http://127.0.0.1:8000`, а документация — по `http://127.0.0.1:8000/docs`.
-
-В `database/colombia_exam.db` создаются таблицы источников, вопросов и попыток. В стартовой базе 20 тренировочных вопросов. Их статус — `reviewed`: перед попаданием в будущий экзаменационный режим каждый вопрос должен быть сверён с методичкой и переведён в `verified`.
+В `database/colombia_exam.db` хранится рабочая база вопросов, попыток, материалов и настроек плана. Перед массовыми правками базы нужен backup и dry-run отчет.
 
 ## Импорт официальной методички
 
@@ -45,7 +35,6 @@ cd backend
 
 Основной источник для будущей базы знаний: [Guía de estudio «Colombia, nuestra casa»](https://www.cancilleria.gov.co/sites/default/files/FOTOS2025/Gu%C3%ADa%20de%20estudio_ajustada.pdf) от Cancillería de Colombia.
 
-Следующий этап — добавить FastAPI, SQLite и импортёр PDF, который создаёт материалы для проверки, но не публикует автоматически сгенерированные вопросы как верифицированные.
 ### Question generation model
 
 Bulk question generation uses `gpt-5-nano` by default. Override it without

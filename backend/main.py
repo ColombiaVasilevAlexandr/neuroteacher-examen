@@ -61,6 +61,7 @@ def initialize():
         CREATE TABLE IF NOT EXISTS exam_sessions (id INTEGER PRIMARY KEY, total_questions INTEGER NOT NULL, correct_answers INTEGER NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS bookmarks (question_id INTEGER PRIMARY KEY, created_at TEXT DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(question_id) REFERENCES questions(id));
         CREATE TABLE IF NOT EXISTS review_queue (question_id INTEGER PRIMARY KEY, due_at TEXT NOT NULL, step INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(question_id) REFERENCES questions(id));
+        CREATE TABLE IF NOT EXISTS study_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         ''')
         try:
             db.execute("ALTER TABLE attempts ADD COLUMN response_time_seconds REAL")
@@ -117,6 +118,43 @@ class SpeechRequest(BaseModel):
     rate: str = "+0%"
     locale: str | None = None
 
+class StudyPlanSettings(BaseModel):
+    exam_date: date
+
+class QuestionGenerationRequest(BaseModel):
+    source_id: int = 1
+    page_number: int
+    count: int = 5
+    force: bool = False
+
+MODULE_ORDER = ("География", "История", "Конституция", "Испанский", "Культура", "Натурализация", "Микротемы")
+AUDIO_LESSONS = {
+    "География": {"id": "geography", "title": "География Колумбии", "file": "lesson-01-geography-full.mp3"},
+    "История": {"id": "history", "title": "История Колумбии", "file": "lesson-02-history-full.mp3"},
+    "Конституция": {"id": "constitution", "title": "Конституция и государство", "file": "lesson-03-constitution-full.mp3"},
+    "Испанский": {"id": "spanish", "title": "Испанский язык", "file": "lesson-04-spanish-full.mp3"},
+    "Культура": {"id": "culture", "title": "Культура Колумбии", "file": "lesson-05-culture-full.mp3"},
+    "Натурализация": {"id": "naturalization", "title": "Натурализация", "file": "lesson-06-naturalization-full.mp3"},
+}
+
+def module_name(topic: str) -> str:
+    if topic in MODULE_ORDER:
+        return topic
+    value = topic.casefold()
+    if any(key in value for key in ("geograf", "hidrograf", "relieve", "cordillera", "amazon")) or "гидрограф" in value:
+        return "География"
+    if any(key in value for key in ("historia", "independencia", "colonial", "guerra", "violencia", "república", "republica")):
+        return "История"
+    if any(key in value for key in ("constituci", "tutela", "habeas", "rama ", "soberan", "plebiscito", "referendo", "legislativa", "control", "participación", "participacion", "ciudadano", "derecho")):
+        return "Конституция"
+    if any(key in value for key in ("castellano", "español", "espaã", "verbo", "adjet", "sustant", "pret", "futuro", "género", "genero", "palabra", "sílaba", "silaba", "vocabulario", "prepos")):
+        return "Испанский"
+    if any(key in value for key in ("cultura", "paz", "valores", "patrimonio", "afrocolomb", "indígen", "indigen", "turismo")):
+        return "Культура"
+    if any(key in value for key in ("naturaliz", "nacionalidad", "sitac", "visa", "residente", "requisito")):
+        return "Натурализация"
+    return "Микротемы"
+
 @app.get('/api/health')
 def health(): return {"status": "ok"}
 
@@ -145,12 +183,206 @@ def questions(limit: int = 20, topic: str | None = None, exclude: str | None = N
     excluded_ids = [int(value) for value in (exclude or '').split(',') if value.strip().isdigit()]
     excluded_sql = f" AND id NOT IN ({','.join('?' for _ in excluded_ids)})" if excluded_ids else ''
     filters = "status IN ('reviewed','verified','ai_reviewed')" + excluded_sql
+    fields = "id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page"
     with conn() as db:
-        if topic:
-            rows = db.execute(f"SELECT id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page FROM questions WHERE {filters} AND topic=? ORDER BY RANDOM() LIMIT ?", (*excluded_ids, topic, limit)).fetchall()
+        if topic and topic in MODULE_ORDER:
+            candidates = db.execute(f"SELECT {fields} FROM questions WHERE {filters} ORDER BY RANDOM()", (*excluded_ids,)).fetchall()
+            rows = [row for row in candidates if module_name(row["topic"]) == topic][:limit]
+        elif topic:
+            rows = db.execute(f"SELECT {fields} FROM questions WHERE {filters} AND topic=? ORDER BY RANDOM() LIMIT ?", (*excluded_ids, topic, limit)).fetchall()
         else:
-            rows = db.execute(f"SELECT id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page FROM questions WHERE {filters} ORDER BY RANDOM() LIMIT ?", (*excluded_ids, limit)).fetchall()
+            rows = db.execute(f"SELECT {fields} FROM questions WHERE {filters} ORDER BY RANDOM() LIMIT ?", (*excluded_ids, limit)).fetchall()
     return [dict(r) for r in rows]
+
+@app.get('/api/study-plan')
+def study_plan(exam_date: date | None = None):
+    """Create a daily plan that consumes unseen questions before any fallback repeats."""
+    with conn() as db:
+        if exam_date is None:
+            saved = db.execute("SELECT value FROM study_settings WHERE key='exam_date'").fetchone()
+            if not saved:
+                return {"exam_date": None, "days_left": None, "message": "Укажите дату экзамена, чтобы составить план."}
+            exam_date = date.fromisoformat(saved['value'])
+        days_left = (exam_date - date.today()).days
+        if days_left < 1:
+            raise HTTPException(400, "Exam date must be in the future")
+
+        allowed = "('reviewed','verified','ai_reviewed')"
+        total = db.execute(f"SELECT COUNT(*) FROM questions WHERE status IN {allowed}").fetchone()[0]
+        unseen = db.execute(f'''SELECT COUNT(*) FROM questions q
+            WHERE q.status IN {allowed} AND NOT EXISTS (SELECT 1 FROM attempts a WHERE a.question_id=q.id)''').fetchone()[0]
+        due = db.execute(f'''SELECT COUNT(*) FROM review_queue r JOIN questions q ON q.id=r.question_id
+            WHERE q.status IN {allowed} AND date(r.due_at) <= date('now','localtime')''').fetchone()[0]
+        daily_new = max(1, (unseen + days_left - 1) // days_left) if unseen else 0
+        daily_reviews = min(due, max(5, daily_new // 2))
+
+        topic_rows = db.execute(f'''SELECT q.topic, COUNT(DISTINCT q.id) AS available,
+            COUNT(DISTINCT CASE WHEN NOT EXISTS (SELECT 1 FROM attempts a WHERE a.question_id=q.id) THEN q.id END) AS unseen,
+            ROUND(100.0 * AVG(CASE WHEN a.correct IS NULL THEN NULL ELSE a.correct END)) AS score
+            FROM questions q LEFT JOIN attempts a ON a.question_id=q.id
+            WHERE q.status IN {allowed} GROUP BY q.topic ORDER BY q.topic''').fetchall()
+    topics = []
+    for row in topic_rows:
+        if row['unseen']:
+            weakness = 1.0 if row['score'] is None else 1 + (100 - row['score']) / 100
+            topics.append({"topic": row['topic'], "available": row['available'], "unseen": row['unseen'], "score": row['score'], "priority": round(weakness, 2)})
+    return {
+        "exam_date": exam_date.isoformat(), "days_left": days_left, "daily_new": daily_new,
+        "daily_reviews": daily_reviews, "total_available": total, "unseen": unseen,
+        "topics": sorted(topics, key=lambda item: (-item['priority'], -item['unseen']))
+    }
+
+@app.get('/api/study-plan/today')
+def today_study_plan(exam_date: date | None = None):
+    plan = study_plan(exam_date)
+    if not plan.get("exam_date"):
+        return {
+            **plan,
+            "mode": "setup",
+            "target_questions": 0,
+            "estimated_minutes": 0,
+            "modules": [],
+            "focus_topics": [],
+            "lesson": [],
+        }
+
+    days_left = plan["days_left"]
+    daily_new = plan["daily_new"]
+    daily_reviews = plan["daily_reviews"]
+    target_questions = max(5, daily_new + daily_reviews)
+    mini_test = min(15, max(5, round(target_questions * 0.35)))
+    mode = "спокойный" if days_left > 60 else "нормальный" if days_left > 30 else "интенсивный" if days_left > 14 else "финальный рывок"
+
+    modules = {name: {"module": name, "available": 0, "unseen": 0, "priority": 1.0} for name in MODULE_ORDER}
+    with conn() as db:
+        all_topics = db.execute("""
+            SELECT topic, COUNT(*) AS available
+            FROM questions
+            WHERE status IN ('reviewed','verified','ai_reviewed')
+            GROUP BY topic
+        """).fetchall()
+    for item in all_topics:
+        modules[module_name(item["topic"])]["available"] += item["available"]
+    for item in plan["topics"]:
+        name = module_name(item["topic"])
+        modules[name]["unseen"] += item["unseen"]
+        modules[name]["priority"] = max(modules[name]["priority"], item["priority"])
+    module_list = sorted(
+        [item for item in modules.values() if item["available"] or item["unseen"]],
+        key=lambda item: (MODULE_ORDER.index(item["module"]), -item["priority"], -item["unseen"]),
+    )
+
+    focus_topics = plan["topics"][:5]
+    focus_name = module_name(focus_topics[0]["topic"]) if focus_topics else (module_list[0]["module"] if module_list else "Общий повтор")
+    error_review = min(8, max(3, daily_reviews))
+    lesson = [
+        {"step": 1, "title": f"Теория: {focus_name}", "minutes": 10, "kind": "theory", "description": "Коротко повторить материал модуля и прослушать аудиоурок модуля дня."},
+        {"step": 2, "title": "Новые вопросы", "minutes": max(8, daily_new), "kind": "new", "count": daily_new, "description": "Пройти новые вопросы, которых еще не было в попытках."},
+        {"step": 3, "title": "Повторение", "minutes": max(6, daily_reviews), "kind": "review", "count": daily_reviews, "description": "Закрепить вопросы из очереди интервального повторения."},
+        {"step": 4, "title": "Разбор ошибок", "minutes": error_review, "kind": "errors", "count": error_review, "description": "Открыть объяснения и понять причину ошибки."},
+        {"step": 5, "title": "Мини-тест", "minutes": mini_test, "kind": "test", "count": mini_test, "description": "Ответить без подсказок и сохранить результат в прогресс."},
+    ]
+    if date.today().weekday() == 6 or days_left <= 14:
+        lesson.append({"step": 6, "title": "Симуляция экзамена", "minutes": 35, "kind": "exam", "count": 30, "description": "Раз в неделю проходить длинный блок в режиме экзамена."})
+
+    return {
+        **plan,
+        "mode": mode,
+        "target_questions": target_questions,
+        "estimated_minutes": sum(item["minutes"] for item in lesson),
+        "modules": module_list,
+        "focus_topics": focus_topics,
+        "audio_lesson": AUDIO_LESSONS.get(focus_name),
+        "lesson": lesson,
+    }
+
+@app.put('/api/study-plan')
+def save_study_plan(payload: StudyPlanSettings):
+    if payload.exam_date <= date.today():
+        raise HTTPException(400, "Exam date must be in the future")
+    with conn() as db:
+        db.execute("INSERT INTO study_settings(key,value) VALUES('exam_date',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (payload.exam_date.isoformat(),))
+    return study_plan(payload.exam_date)
+
+@app.get('/api/study-plan/questions')
+def study_plan_questions(limit: int = 20):
+    """Return due reviews first, then questions never answered by the learner."""
+    limit = min(max(limit, 1), 50)
+    allowed = "('reviewed','verified','ai_reviewed')"
+    fields = 'id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page'
+    with conn() as db:
+        due = db.execute(f'''SELECT q.{fields} FROM review_queue r JOIN questions q ON q.id=r.question_id
+            WHERE q.status IN {allowed} AND date(r.due_at) <= date('now','localtime')
+            ORDER BY r.due_at, q.id LIMIT ?''', (limit,)).fetchall()
+        remaining = limit - len(due)
+        fresh = [] if remaining == 0 else db.execute(f'''SELECT {fields} FROM questions q
+            WHERE q.status IN {allowed} AND NOT EXISTS (SELECT 1 FROM attempts a WHERE a.question_id=q.id)
+            ORDER BY RANDOM() LIMIT ?''', (remaining,)).fetchall()
+    return {"questions": [dict(row) for row in [*due, *fresh]], "due_reviews": len(due), "new_questions": len(fresh)}
+
+@app.post('/api/questions/generate')
+def generate_questions(payload: QuestionGenerationRequest):
+    """Generate once from an official material page and persist the result for review."""
+    count = min(max(payload.count, 1), 10)
+    with conn() as db:
+        page = db.execute("SELECT text FROM material_pages WHERE source_id=? AND page_number=?", (payload.source_id, payload.page_number)).fetchone()
+        if not page:
+            raise HTTPException(404, "Material page not found")
+        existing = db.execute("SELECT COUNT(*) FROM questions WHERE source_id=? AND source_page=?", (payload.source_id, payload.page_number)).fetchone()[0]
+        if existing >= count and not payload.force:
+            return {"created": 0, "skipped": True, "existing": existing, "message": "Questions for this page are already saved."}
+        needed = count if payload.force else count - existing
+
+    provider = os.getenv("AI_PROVIDER", "openai").lower()
+    key_name = "DEEPSEEK_API_KEY" if provider == "deepseek" else "OPENAI_API_KEY"
+    key = os.getenv(key_name)
+    if not key:
+        raise HTTPException(503, f"{key_name} is not configured")
+    source_text = page['text'][:12000]
+    prompt = f'''Create exactly {needed} multiple-choice questions from the official Colombian nationality-study material below.
+Use only facts explicitly stated in the source. Each question must have one correct answer and three plausible but false alternatives.
+Write question and answers in Spanish, plus Russian translations and a short Russian explanation. Return JSON only, as an array of objects with keys: question_es, question_ru, answer_a, answer_a_ru, answer_b, answer_b_ru, answer_c, answer_c_ru, answer_d, answer_d_ru, correct_answer, topic, explanation_es, explanation_ru, source_quote.
+correct_answer must be A, B, C, or D. source_quote must be a short supporting quote from this source.
+Official source, page {payload.page_number}:
+{source_text}'''
+    try:
+        if provider == "deepseek":
+            request_body = {"model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"), "messages": [{"role": "user", "content": prompt}], "temperature": 0.2, "response_format": {"type": "json_object"}}
+            req = urlrequest.Request("https://api.deepseek.com/chat/completions", data=json.dumps(request_body).encode("utf-8"), headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}, method="POST")
+            with urlrequest.urlopen(req, timeout=90) as response:
+                raw = json.loads(response.read().decode("utf-8"))["choices"][0]["message"]["content"]
+        else:
+            request_body = {"model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"), "input": [{"role": "developer", "content": "Return valid JSON only."}, {"role": "user", "content": prompt}], "text": {"format": {"type": "json_object"}}, "max_output_tokens": 5000}
+            req = urlrequest.Request("https://api.openai.com/v1/responses", data=json.dumps(request_body).encode("utf-8"), headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}, method="POST")
+            with urlrequest.urlopen(req, timeout=90) as response:
+                data = json.loads(response.read().decode("utf-8"))
+                raw = "".join(part.get("text", "") for output in data.get("output", []) if output.get("type") == "message" for part in output.get("content", []) if part.get("type") == "output_text")
+        generated = json.loads(raw)
+        if isinstance(generated, dict):
+            generated = generated.get("questions", [])
+        if not isinstance(generated, list):
+            raise ValueError("Expected a JSON array of questions")
+    except (HTTPError, URLError, ValueError, KeyError, json.JSONDecodeError) as error:
+        raise HTTPException(502, f"Question generation failed: {error}")
+
+    required = (
+        "question_es", "question_ru", "answer_a", "answer_a_ru", "answer_b", "answer_b_ru",
+        "answer_c", "answer_c_ru", "answer_d", "answer_d_ru", "correct_answer", "topic",
+        "explanation_es", "explanation_ru", "source_quote"
+    )
+    created = 0
+    with conn() as db:
+        for item in generated[:needed]:
+            if not isinstance(item, dict) or any(not str(item.get(field, "")).strip() for field in required) or item.get("correct_answer") not in ("A", "B", "C", "D"):
+                continue
+            duplicate = db.execute("SELECT 1 FROM questions WHERE source_id=? AND source_page=? AND lower(question_es)=lower(?)", (payload.source_id, payload.page_number, item["question_es"].strip())).fetchone()
+            if duplicate:
+                continue
+            db.execute('''INSERT INTO questions(question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,correct_answer,topic,explanation_es,explanation_ru,source_quote,status,source_id,source_page)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', (
+                item["question_es"].strip(), item.get("question_ru", "").strip(), item["answer_a"].strip(), item.get("answer_a_ru", "").strip(), item["answer_b"].strip(), item.get("answer_b_ru", "").strip(), item["answer_c"].strip(), item.get("answer_c_ru", "").strip(), item["answer_d"].strip(), item.get("answer_d_ru", "").strip(), item["correct_answer"], item["topic"].strip(), item["explanation_es"].strip(), item.get("explanation_ru", "").strip(), item.get("source_quote", "").strip(), "ai_reviewed", payload.source_id, payload.page_number))
+            created += 1
+    return {"created": created, "skipped": False, "status": "ai_reviewed", "source_page": payload.page_number}
 
 @app.get('/api/exams/formats')
 def exam_formats():
@@ -242,7 +474,11 @@ def dashboard():
             FROM attempts a JOIN questions q ON q.id=a.question_id
             ORDER BY a.id DESC LIMIT 5
         ''').fetchall()]
-        topic_counts = [dict(row) for row in db.execute("SELECT topic, COUNT(*) AS count FROM questions WHERE status IN ('reviewed','verified') GROUP BY topic ORDER BY count DESC").fetchall()]
+        raw_topic_counts = [dict(row) for row in db.execute("SELECT topic, COUNT(*) AS count FROM questions WHERE status IN ('reviewed','verified','ai_reviewed') GROUP BY topic ORDER BY count DESC").fetchall()]
+        module_counts = {name: 0 for name in MODULE_ORDER}
+        for row in raw_topic_counts:
+            module_counts[module_name(row["topic"])] += row["count"]
+        topic_counts = [{"topic": name, "count": count} for name, count in module_counts.items() if count]
         trend = []
         today = date.today()
         for days_ago in range(4, -1, -1):
@@ -359,4 +595,17 @@ def weak_topics():
             GROUP BY q.topic HAVING COUNT(a.id) > 0
             ORDER BY score ASC, attempts DESC LIMIT 5
         ''').fetchall()
-    return [dict(row) for row in rows]
+    modules = {}
+    for row in rows:
+        name = module_name(row["topic"])
+        current = modules.setdefault(name, {"topic": name, "attempts": 0, "correct_weighted": 0.0})
+        current["attempts"] += row["attempts"]
+        current["correct_weighted"] += (row["score"] or 0) * row["attempts"]
+    result = []
+    for item in modules.values():
+        result.append({
+            "topic": item["topic"],
+            "attempts": item["attempts"],
+            "score": round(item["correct_weighted"] / item["attempts"]) if item["attempts"] else 0,
+        })
+    return sorted(result, key=lambda item: (item["score"], -item["attempts"]))[:5]
