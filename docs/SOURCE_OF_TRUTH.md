@@ -9,6 +9,7 @@
 - `backend/main.py` - FastAPI API, SQLite schema migration, study plan, topics/modules, speech, AI chat, exam and review endpoints.
 - `database/colombia_exam.db` - текущая рабочая SQLite база вопросов, попыток, материалов и настроек плана.
 - `frontend/public/index.html` - единственный HTML entrypoint для пользовательского запуска.
+- `frontend/public/runtime-config.js` - runtime API resolver for local, LAN and reverse-proxy deployment.
 - `frontend/public/legacy-app.bundle.js` - основной static UI bundle.
 - `frontend/public/app.bundle.css` - основной static CSS bundle.
 - `frontend/public/study-plan.js` - overlay daily plan and lesson session.
@@ -44,10 +45,18 @@ powershell -ExecutionPolicy Bypass -File scripts\start-neuroteacher.ps1
 powershell -ExecutionPolicy Bypass -File scripts\start-neuroteacher.ps1 -NoBrowser
 ```
 
+Для Android в той же Wi-Fi/LAN сети:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-neuroteacher.ps1 -Lan
+```
+
+Откройте на Android адрес, который скрипт выведет как `Android/LAN URL`. В LAN-режиме backend и frontend слушают `0.0.0.0`; Windows Firewall должен пропускать порты `5173` и `8000`.
+
 Скрипт запускает:
 
-- backend: `python -m uvicorn main:app --host 127.0.0.1 --port 8000` из `backend`;
-- frontend: `python -m http.server 5173 --bind 127.0.0.1` из `frontend/public`.
+- backend: `python -m uvicorn main:app --host <bindHost> --port 8000` из `backend`;
+- frontend: `python -m http.server 5173 --bind <bindHost>` из `frontend/public`.
 
 Vite не является рабочим запуском этого дерева.
 
@@ -58,6 +67,7 @@ Vite не является рабочим запуском этого дерев
 Разрешено менять:
 
 - `frontend/public/index.html`;
+- `frontend/public/runtime-config.js`;
 - подключенные static assets in `frontend/public`;
 - `frontend/public/study-plan.js`;
 - `frontend/public/audio-library.js`;
@@ -174,6 +184,7 @@ Static frontend contract:
 ```powershell
 $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5173/
 $r.Content.Contains('colombia-exam-static')
+$r.Content.Contains('/runtime-config.js')
 $r.Content.Contains('/legacy-app.bundle.js')
 $r.Content.Contains('/study-plan.js')
 $r.Content.Contains('/audio-library.js')
@@ -216,6 +227,7 @@ Expected current facts:
 - backend health: `ok`;
 - frontend HTTP status: `200`;
 - frontend static marker: present;
+- runtime API resolver: present;
 - all 7 modules return questions;
 - study plan total: `646`;
 - study plan modules: `7`;

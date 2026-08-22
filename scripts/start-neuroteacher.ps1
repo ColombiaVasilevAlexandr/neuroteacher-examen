@@ -1,5 +1,6 @@
 param(
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [switch]$Lan
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,6 +17,7 @@ $backendOut = Join-Path $logDir 'backend.out.log'
 $backendErr = Join-Path $logDir 'backend.err.log'
 $frontendOut = Join-Path $logDir 'frontend.out.log'
 $frontendErr = Join-Path $logDir 'frontend.err.log'
+$bindHost = if ($Lan) { '0.0.0.0' } else { '127.0.0.1' }
 
 if (-not (Test-Path $python)) {
     throw "Python runtime was not found. Checked: $systemPython and $venvPython"
@@ -51,6 +53,7 @@ function Test-Frontend {
         $response = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:5173/' -TimeoutSec 3
         return $response.StatusCode -eq 200 `
             -and $response.Content.Contains('content="colombia-exam-static"') `
+            -and $response.Content.Contains('/runtime-config.js') `
             -and $response.Content.Contains('/legacy-app.bundle.js') `
             -and $response.Content.Contains('/study-plan.js') `
             -and $response.Content.Contains('/audio-library.js')
@@ -108,6 +111,16 @@ function Wait-For([scriptblock]$Probe, [int]$Seconds = 25) {
     return $false
 }
 
+function Get-LanAddress {
+    $address = Get-NetIPConfiguration |
+        Where-Object { $_.IPv4DefaultGateway -and $_.IPv4Address } |
+        ForEach-Object { $_.IPv4Address.IPAddress } |
+        Where-Object { $_ -and $_ -notlike '169.254.*' } |
+        Select-Object -First 1
+    if ($address) { return $address }
+    return '127.0.0.1'
+}
+
 Stop-ProjectListener 8000 'backend'
 Stop-ProjectListener 5173 'frontend'
 
@@ -115,7 +128,7 @@ if (-not (Test-Backend)) {
     if (Test-Port 8000) { Stop-OwnedListener 8000 'backend' }
     Remove-Item $backendOut, $backendErr -Force -ErrorAction SilentlyContinue
     Start-Process -FilePath $python `
-        -ArgumentList @('-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '8000') `
+        -ArgumentList @('-m', 'uvicorn', 'main:app', '--host', $bindHost, '--port', '8000') `
         -WorkingDirectory $backend `
         -WindowStyle Hidden `
         -RedirectStandardOutput $backendOut `
@@ -126,7 +139,7 @@ if (-not (Test-Frontend)) {
     if (Test-Port 5173) { Stop-OwnedListener 5173 'frontend' }
     Remove-Item $frontendOut, $frontendErr -Force -ErrorAction SilentlyContinue
     Start-Process -FilePath $python `
-        -ArgumentList @('-m', 'http.server', '5173', '--bind', '127.0.0.1') `
+        -ArgumentList @('-m', 'http.server', '5173', '--bind', $bindHost) `
         -WorkingDirectory $staticFrontend `
         -WindowStyle Hidden `
         -RedirectStandardOutput $frontendOut `
@@ -151,7 +164,9 @@ if (-not $backendReady -or -not $frontendReady) {
 }
 
 $launchId = Get-Date -Format 'yyyyMMddHHmmss'
-$url = "http://127.0.0.1:5173/?static=1&launch=$launchId"
+$browserHost = if ($Lan) { Get-LanAddress } else { '127.0.0.1' }
+$url = "http://${browserHost}:5173/?static=1&launch=$launchId"
 Write-Host "COLOMBIA EXAM is running: $url"
+if ($Lan) { Write-Host "Android/LAN URL: $url" }
 Write-Host "Logs: $logDir"
 if (-not $NoBrowser) { Start-Process $url }

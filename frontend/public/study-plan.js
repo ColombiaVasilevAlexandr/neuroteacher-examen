@@ -1,5 +1,5 @@
 (() => {
-  const API = 'http://127.0.0.1:8000/api'
+  const API = window.COLOMBIA_API_BASE || 'http://127.0.0.1:8000/api'
   const css = document.createElement('style')
   css.textContent = `
     .study-plan-card{border:1px solid #3f5968;background:linear-gradient(135deg,#101b25,#071017);border-radius:18px;margin:0 0 18px;padding:22px;color:#eef7fb;box-shadow:0 12px 30px #0005}

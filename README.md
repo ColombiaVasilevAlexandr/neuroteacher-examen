@@ -16,6 +16,14 @@ powershell -ExecutionPolicy Bypass -File scripts\start-neuroteacher.ps1
 
 API доступен на `http://127.0.0.1:8000/api`.
 
+## Android в той же Wi-Fi сети
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-neuroteacher.ps1 -Lan
+```
+
+Откройте на Android адрес, который скрипт покажет как `Android/LAN URL`. Если телефон не открывает страницу, проверьте Windows Firewall для портов `5173` и `8000`.
+
 Текущий рабочий frontend - static из `frontend/public`. Vite не является основным запуском этого дерева.
 
 В `database/colombia_exam.db` хранится рабочая база вопросов, попыток, материалов и настроек плана. Перед массовыми правками базы нужен backup и dry-run отчет.

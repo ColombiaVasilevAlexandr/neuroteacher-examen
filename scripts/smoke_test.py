@@ -50,8 +50,12 @@ def main() -> int:
     assert_true(bool(plan.get("audio_lesson")), "study plan does not expose audio_lesson")
 
     html = get_text(FRONTEND)
-    for marker in ("colombia-exam-static", "/legacy-app.bundle.js", "/study-plan.js", "/audio-library.js"):
+    for marker in ("colombia-exam-static", "/runtime-config.js", "/legacy-app.bundle.js", "/study-plan.js", "/audio-library.js"):
         assert_true(marker in html, f"frontend missing marker: {marker}")
+
+    runtime_config = get_text(f"{FRONTEND}runtime-config.js")
+    assert_true("COLOMBIA_API_BASE" in runtime_config, "runtime config does not define API base")
+    assert_true("window.location.port === '5173'" in runtime_config, "runtime config does not support LAN dev port")
 
     audit = (ROOT / "docs" / "DATABASE_AUDIT.md").read_text(encoding="utf-8")
     assert_true("Suspicious sample count: `0`" in audit, "database audit has suspicious samples")
