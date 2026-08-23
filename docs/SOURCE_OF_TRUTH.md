@@ -14,6 +14,7 @@
 - `frontend/public/app.bundle.css` - основной static CSS bundle.
 - `frontend/public/study-plan.js` - overlay daily plan and lesson session.
 - `frontend/public/audio-library.js` - audio library and "module of the day" playback integration.
+- `docs/FRONTEND_RUNTIME.md` - static frontend runtime contract and migration boundary.
 - `scripts/start-neuroteacher.ps1` - единственный поддерживаемый локальный запуск.
 - `scripts/audit_db.py` - full read-only SQLite audit and report generator.
 - `scripts/report_db_encoding.py` - dry-run audit script for suspected mojibake in SQLite text columns.
