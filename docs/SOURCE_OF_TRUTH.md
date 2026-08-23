@@ -130,7 +130,7 @@ python scripts\report_db_encoding.py
 Текущий backup:
 
 ```text
-database/colombia_exam.backup-20260821-205537.db
+database/colombia_exam.backup-20260823-090337.db
 ```
 
 ## Git hygiene

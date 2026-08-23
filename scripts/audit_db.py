@@ -141,9 +141,14 @@ def build_report() -> str:
         f"- database size: `{DB_PATH.stat().st_size}` bytes",
         f"- database sha256: `{sha256(DB_PATH)}`",
     ]
+    current_hash = sha256(DB_PATH)
+    current_backup_count = 0
     for backup in backups:
-        same = sha256(backup) == sha256(DB_PATH)
+        same = sha256(backup) == current_hash
+        if same:
+            current_backup_count += 1
         lines.append(f"- backup: `{backup.relative_to(ROOT)}` sha256 `{sha256(backup)}` same_as_current `{str(same).lower()}`")
+    lines.append(f"- current backup count: `{current_backup_count}`")
 
     lines += ["", "## Tables", ""]
     for table, count in counts.items():
@@ -188,7 +193,7 @@ def build_report() -> str:
         "## Decision",
         "",
         "- No database write-fix is required when suspicious sample count is `0`.",
-        "- The current database and the listed backup are identical when `same_as_current` is `true`.",
+        "- At least one listed backup must match the current database before handoff.",
         "- Raw topics are intentionally preserved; student UI consumes the 7 aggregated modules.",
         "",
     ]

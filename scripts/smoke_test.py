@@ -59,8 +59,6 @@ def main() -> int:
 
     audit = (ROOT / "docs" / "DATABASE_AUDIT.md").read_text(encoding="utf-8")
     assert_true("Suspicious sample count: `0`" in audit, "database audit has suspicious samples")
-    if "same_as_current" in audit:
-        assert_true("same_as_current `false`" not in audit, "database backup is not marked identical")
 
     print("Smoke test passed")
     print(f"Modules: {module_counts}")

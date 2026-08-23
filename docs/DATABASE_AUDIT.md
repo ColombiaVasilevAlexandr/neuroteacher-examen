@@ -1,23 +1,26 @@
 # Database Audit
 
-Generated: 2026-08-22T12:43:16
+Generated: 2026-08-23T09:03:49
 
 ## Files
 
 - database: `database\colombia_exam.db`
-- database size: `1286144` bytes
-- database sha256: `ac2431bff6c9f326ae4f2b5d4a90e2a0af538d100908cd7517f4fa38276e4201`
-- backup: `database\colombia_exam.backup-20260821-205537.db` sha256 `ac2431bff6c9f326ae4f2b5d4a90e2a0af538d100908cd7517f4fa38276e4201` same_as_current `true`
+- database size: `1290240` bytes
+- database sha256: `0c125eb9bf80eab54c3450223aeaabeaea4ecd04c883f025249ee5a37cb34ce5`
+- backup: `database\colombia_exam.backup-20260821-205537.db` sha256 `ac2431bff6c9f326ae4f2b5d4a90e2a0af538d100908cd7517f4fa38276e4201` same_as_current `false`
+- backup: `database\colombia_exam.backup-20260822-140121.db` sha256 `800b5221ac36adb9f8e90daa66cb451c94de3b0e75803b347510df1a1a083606` same_as_current `false`
+- backup: `database\colombia_exam.backup-20260823-090337.db` sha256 `0c125eb9bf80eab54c3450223aeaabeaea4ecd04c883f025249ee5a37cb34ce5` same_as_current `true`
+- current backup count: `1`
 
 ## Tables
 
-- `attempts`: 236
+- `attempts`: 265
 - `bookmarks`: 0
 - `exam_sessions`: 0
 - `material_chapters`: 46
 - `material_pages`: 179
 - `questions`: 646
-- `review_queue`: 95
+- `review_queue`: 109
 - `sources`: 1
 - `study_settings`: 1
 
@@ -102,5 +105,5 @@ Suspicious sample count: `0`
 ## Decision
 
 - No database write-fix is required when suspicious sample count is `0`.
-- The current database and the listed backup are identical when `same_as_current` is `true`.
+- At least one listed backup must match the current database before handoff.
 - Raw topics are intentionally preserved; student UI consumes the 7 aggregated modules.
