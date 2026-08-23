@@ -4,8 +4,12 @@
     if (!button) return
     const existing = button.querySelector('.review-badge')
     if (!count) { existing?.remove(); return }
-    if (existing) { existing.textContent=count > 9 ? '9+' : count; return }
-    const badge = document.createElement('em'); badge.className='review-badge'; badge.textContent=count > 9 ? '9+' : count
+    const label = count > 9 ? '9+' : String(count)
+    if (existing) {
+      if (existing.textContent !== label) existing.textContent = label
+      return
+    }
+    const badge = document.createElement('em'); badge.className='review-badge'; badge.textContent=label
     button.append(badge)
   }
   let latest = 0

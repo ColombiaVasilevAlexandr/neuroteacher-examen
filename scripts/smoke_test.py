@@ -56,14 +56,10 @@ def main() -> int:
         "/legacy-app.bundle.js",
         "/study-plan.js",
         "/audio-library.js",
-        "/methodology-course.js",
         "/review-session.js",
-        "/spanish-lab.js",
-        "/spanish-access.js",
         "/voice-practice.js",
         "/consultant-shortcuts.js",
         "/review-session.css",
-        "/spanish-lab.css",
         "/voice-practice.css",
     ):
         assert_true(marker in html, f"frontend missing marker: {marker}")

@@ -119,6 +119,78 @@ class ChatRequest(BaseModel):
     message: str
     history: list[ChatMessage] = []
 
+def ai_provider_config() -> dict[str, str | None]:
+    provider = os.getenv("AI_PROVIDER", "openai").lower()
+    if provider == "deepseek":
+        return {
+            "provider": "deepseek",
+            "key": os.getenv("DEEPSEEK_API_KEY"),
+            "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+        }
+    return {
+        "provider": "openai",
+        "key": os.getenv("OPENAI_API_KEY"),
+        "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+    }
+
+def ai_provider_health(timeout: int = 5) -> dict[str, object]:
+    config = ai_provider_config()
+    if not config["key"]:
+        return {"provider": config["provider"], "configured": False, "available": False, "reason": "api_key_missing"}
+    if config["provider"] == "deepseek":
+        url = "https://api.deepseek.com/chat/completions"
+        body = {"model": config["model"], "messages": [{"role": "user", "content": "ping"}], "temperature": 0, "max_tokens": 1}
+    else:
+        url = "https://api.openai.com/v1/responses"
+        body = {"model": config["model"], "input": [{"role": "user", "content": "ping"}], "max_output_tokens": 16}
+    req = urlrequest.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Authorization": f"Bearer {config['key']}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlrequest.urlopen(req, timeout=timeout) as response:
+            return {
+                "provider": config["provider"],
+                "configured": True,
+                "available": 200 <= response.status < 300,
+                "model": config["model"],
+            }
+    except HTTPError as exc:
+        return {"provider": config["provider"], "configured": True, "available": False, "model": config["model"], "reason": f"http_{exc.code}"}
+    except URLError:
+        return {"provider": config["provider"], "configured": True, "available": False, "model": config["model"], "reason": "unreachable"}
+    except Exception:
+        return {"provider": config["provider"], "configured": True, "available": False, "model": config["model"], "reason": "probe_failed"}
+
+def sanitize_ai_text(text: str) -> str:
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1", text)
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)
+    text = re.sub(r"(?m)^\s*-{3,}\s*$", "", text)
+    text = re.sub(r"[*_`~]{1,3}", "", text)
+    text = text.replace("#", "")
+    return re.sub(r"\s+", " ", text).strip()
+
+def local_ai_reply(message: str, reason: str = "provider_unavailable") -> str:
+    asks_in_russian = bool(re.search(r"[\u0400-\u04FF]", message))
+    spanish = (
+        "Estoy en modo local porque el proveedor de IA no responde ahora. "
+        "Puedo ayudarte con pr\u00e1ctica b\u00e1sica: responde en espa\u00f1ol con una frase corta y luego revisamos. "
+        "Pregunta: \u00bfCu\u00e1l es la capital de Colombia?"
+    )
+    russian = (
+        "\u0421\u0435\u0439\u0447\u0430\u0441 \u0432\u043a\u043b\u044e\u0447\u0435\u043d \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u044b\u0439 \u0440\u0435\u0436\u0438\u043c: "
+        "\u0432\u043d\u0435\u0448\u043d\u0438\u0439 AI-\u043f\u0440\u043e\u0432\u0430\u0439\u0434\u0435\u0440 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d. "
+        "\u042f \u043c\u043e\u0433\u0443 \u0434\u0430\u0442\u044c \u0431\u0430\u0437\u043e\u0432\u0443\u044e \u0442\u0440\u0435\u043d\u0438\u0440\u043e\u0432\u043a\u0443 \u0431\u0435\u0437 \u0441\u0435\u0442\u0438: "
+        "\u043e\u0442\u0432\u0435\u0442\u044c\u0442\u0435 \u043f\u043e-\u0438\u0441\u043f\u0430\u043d\u0441\u043a\u0438 \u043a\u043e\u0440\u043e\u0442\u043a\u043e\u0439 \u0444\u0440\u0430\u0437\u043e\u0439, "
+        "\u0437\u0430\u0442\u0435\u043c \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u043c. "
+        "\u0412\u043e\u043f\u0440\u043e\u0441: \u043a\u0430\u043a\u0430\u044f \u0441\u0442\u043e\u043b\u0438\u0446\u0430 \u041a\u043e\u043b\u0443\u043c\u0431\u0438\u0438?"
+    )
+    if asks_in_russian:
+        return f"{russian}\n\nES: {spanish}"
+    return f"{spanish}\n\nRU: {russian}"
+
 class SpeechRequest(BaseModel):
     text: str
     rate: str = "+0%"
@@ -166,7 +238,7 @@ def health(): return {"status": "ok"}
 
 @app.post('/api/consultant/speech')
 async def consultant_speech(payload: SpeechRequest):
-    text = payload.text.strip()
+    text = sanitize_ai_text(payload.text)
     if not text:
         raise HTTPException(400, "Text is required")
     voice = "ru-RU-DmitryNeural" if re.search(r"[А-Яа-яЁё]", text) else "es-CO-GonzaloNeural"
@@ -429,13 +501,14 @@ def complete_exam(payload: ExamResult):
 
 @app.get('/api/ai/status')
 def ai_status():
-    provider = os.getenv("AI_PROVIDER", "openai").lower()
-    available = bool(os.getenv("OPENAI_API_KEY")) if provider == "openai" else bool(os.getenv("DEEPSEEK_API_KEY"))
-    return {"provider": provider, "available": available}
+    status = ai_provider_health()
+    status["mode"] = "remote" if status["available"] else "local_fallback"
+    return status
 
 @app.post('/api/ai/chat')
 def ai_chat(payload: ChatRequest):
-    provider = os.getenv("AI_PROVIDER", "openai").lower()
+    config = ai_provider_config()
+    provider = str(config["provider"])
     system = """Eres un profesor para el examen de nacionalidad colombiana. Habla principalmente en español claro, nivel A2-B1. Si el estudiante escribe en ruso, añade una explicación breve en ruso. Corrige errores con tacto. Haz una sola pregunta cada vez. No inventes datos oficiales; indica cuando algo requiere verificar la guía Colombia, nuestra casa."""
     system += " Always add a concise Russian translation after every Spanish explanation, question, or correction. Use clear plain text without Markdown or emoji."
     history = [{"role": item.role, "content": item.content} for item in payload.history[-10:]]
@@ -445,26 +518,25 @@ def ai_chat(payload: ChatRequest):
             return json.loads(response.read().decode("utf-8"))
     try:
         if provider == "deepseek":
-            key = os.getenv("DEEPSEEK_API_KEY")
-            if not key: raise HTTPException(503, "DEEPSEEK_API_KEY is not configured")
-            data = post_json("https://api.deepseek.com/chat/completions", key, {"model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"), "messages": [{"role":"system","content":system}, *history, {"role":"user","content":payload.message}], "temperature":0.35, "max_tokens":220})
+            key = config["key"]
+            if not key:
+                return {"provider": provider, "reply": local_ai_reply(payload.message, "api_key_missing"), "fallback": True, "reason": "api_key_missing"}
+            data = post_json("https://api.deepseek.com/chat/completions", str(key), {"model": config["model"], "messages": [{"role":"system","content":system}, *history, {"role":"user","content":payload.message}], "temperature":0.35, "max_tokens":220})
             text = data["choices"][0]["message"]["content"]
         else:
-            key = os.getenv("OPENAI_API_KEY")
-            if not key: raise HTTPException(503, "OPENAI_API_KEY is not configured")
+            key = config["key"]
+            if not key:
+                return {"provider": provider, "reply": local_ai_reply(payload.message, "api_key_missing"), "fallback": True, "reason": "api_key_missing"}
             input_messages = [{"role":"developer","content":system}, *history, {"role":"user","content":payload.message}]
-            data = post_json("https://api.openai.com/v1/responses", key, {"model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"), "input": input_messages, "max_output_tokens":600})
+            data = post_json("https://api.openai.com/v1/responses", str(key), {"model": config["model"], "input": input_messages, "max_output_tokens":600})
             text = "".join(part.get("text", "") for output in data.get("output", []) if output.get("type") == "message" for part in output.get("content", []) if part.get("type") == "output_text")
-        text = re.sub(r"(?m)^#{1,6}\s*", "", text).replace("**", "").replace("__", "").replace("`", "")
-        return {"provider": provider, "reply": text.strip()}
-    except HTTPException:
-        raise
+        return {"provider": provider, "reply": sanitize_ai_text(text), "fallback": False}
     except HTTPError as exc:
-        raise HTTPException(502, f"AI provider returned HTTP {exc.code}")
+        return {"provider": provider, "reply": local_ai_reply(payload.message, f"http_{exc.code}"), "fallback": True, "reason": f"http_{exc.code}"}
     except URLError:
-        raise HTTPException(502, "AI provider is unreachable")
+        return {"provider": provider, "reply": local_ai_reply(payload.message, "unreachable"), "fallback": True, "reason": "unreachable"}
     except Exception:
-        raise HTTPException(502, "AI provider request failed")
+        return {"provider": provider, "reply": local_ai_reply(payload.message, "request_failed"), "fallback": True, "reason": "request_failed"}
 
 @app.get('/api/dashboard')
 def dashboard():

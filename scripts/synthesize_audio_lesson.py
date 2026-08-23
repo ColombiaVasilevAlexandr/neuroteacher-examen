@@ -4,6 +4,8 @@ from pathlib import Path
 
 import edge_tts
 
+from audio_text import clean_for_tts
+
 
 async def main():
     parser = argparse.ArgumentParser()
@@ -11,7 +13,7 @@ async def main():
     parser.add_argument("output_dir")
     parser.add_argument("prefix")
     args = parser.parse_args()
-    words = Path(args.source).read_text(encoding="utf-8").split()
+    words = clean_for_tts(Path(args.source).read_text(encoding="utf-8")).split()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     chunks = [words[index:index + 300] for index in range(0, len(words), 300)]

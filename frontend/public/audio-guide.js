@@ -1,4 +1,7 @@
 (() => {
+  document.querySelectorAll('.audio-guide').forEach(element => element.remove())
+  return
+
   const completedKey = 'colombia-exam-audio-lesson-1-completed'
   const style = document.createElement('style')
   style.textContent = `

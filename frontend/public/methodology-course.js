@@ -1,4 +1,7 @@
 (() => {
+  document.querySelectorAll('.methodology-course').forEach(element => element.remove())
+  return
+
   const style = document.createElement('style')
   style.textContent = `
     .methodology-course { border: 1px solid #4a5b67; background: linear-gradient(135deg, #121f29, #0b1117); border-radius: 20px; margin-top: 18px; padding: 22px; }

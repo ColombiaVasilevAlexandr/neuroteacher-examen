@@ -1,4 +1,7 @@
 (() => {
+  document.querySelectorAll('.audio-mini-test').forEach(element => element.remove())
+  return
+
   const topics = { 'География': 'Geografía', 'История': 'Historia', 'Конституция': 'Constitución', 'Испанский язык': 'Castellano', 'Культура': 'Cultura', 'Натурализация': 'Naturalización' }
   const api = 'http://127.0.0.1:8000/api'
   const escapeHtml = value => String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])

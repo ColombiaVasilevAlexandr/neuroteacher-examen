@@ -1,4 +1,7 @@
 (() => {
+  document.querySelectorAll('.spanish-access').forEach(element => element.remove())
+  return
+
   const add = () => {
     if (document.querySelector('.spanish-access')) return
     const button = document.createElement('button')

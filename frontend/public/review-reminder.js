@@ -4,9 +4,14 @@
     if (!card) return
     const existing = card.querySelector('.review-reminder')
     if (!count) { existing?.remove(); return }
-    if (existing) { existing.querySelector('span').textContent=`${count} ${count === 1 ? 'вопрос' : 'вопросов'} по расписанию`; return }
+    const label = `${count} ${count === 1 ? 'вопрос' : 'вопросов'} по расписанию`
+    if (existing) {
+      const span = existing.querySelector('span')
+      if (span && span.textContent !== label) span.textContent = label
+      return
+    }
     const reminder = document.createElement('div'); reminder.className='review-reminder'
-    reminder.innerHTML=`<div><b>Повторение ждёт</b><span>${count} ${count === 1 ? 'вопрос' : 'вопросов'} по расписанию</span></div><button>Повторить</button>`
+    reminder.innerHTML=`<div><b>Повторение ждёт</b><span>${label}</span></div><button>Повторить</button>`
     reminder.querySelector('button').onclick=()=>[...document.querySelectorAll('.nav')].find(button=>/Повторение|Repaso/.test(button.textContent))?.click()
     card.querySelector('.start')?.insertAdjacentElement('beforebegin',reminder)
   }
