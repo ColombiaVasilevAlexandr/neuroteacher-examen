@@ -1,11 +1,25 @@
 (() => {
+  const text = {
+    title: '\u0410\u0443\u0434\u0438\u043e\u0442\u0435\u043a\u0430 \u043c\u0435\u0442\u043e\u0434\u0438\u0447\u043a\u0438',
+    intro: '\u0421\u043b\u0443\u0448\u0430\u0439\u0442\u0435 \u0432\u0441\u044e \u043c\u0435\u0442\u043e\u0434\u0438\u0447\u043a\u0443 \u043f\u043e\u0434\u0440\u044f\u0434 \u0438\u043b\u0438 \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u044b\u0435 \u043c\u043e\u0434\u0443\u043b\u0438. \u041f\u043e\u0437\u0438\u0446\u0438\u044f \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u0442\u0441\u044f \u0432 \u044d\u0442\u043e\u043c \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435.',
+    continue: '\u0421\u043b\u0443\u0448\u0430\u0442\u044c \u0434\u0430\u043b\u044c\u0448\u0435',
+    pause: '\u041f\u0430\u0443\u0437\u0430',
+    stop: '\u0421\u0442\u043e\u043f',
+    playAll: '\u0421\u043b\u0443\u0448\u0430\u0442\u044c \u0432\u0441\u044e \u043c\u0435\u0442\u043e\u0434\u0438\u0447\u043a\u0443',
+    otherModules: '\u0414\u0440\u0443\u0433\u0438\u0435 \u043c\u043e\u0434\u0443\u043b\u0438',
+    saved: '\u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e',
+    fromStart: '\u0441 \u043d\u0430\u0447\u0430\u043b\u0430',
+    start: '\u043d\u0430\u0447\u0430\u0442\u044c',
+    listenFrom: '\u0441\u043b\u0443\u0448\u0430\u0442\u044c \u0441',
+  }
+
   const lessons = [
-    { id: 'geography', number: '01', title: 'География Колумбии', topic: 'География', file: 'lesson-01-geography-full.mp3' },
-    { id: 'history', number: '02', title: 'История Колумбии', topic: 'История', file: 'lesson-02-history-full.mp3' },
-    { id: 'constitution', number: '03', title: 'Конституция и государство', topic: 'Конституция', file: 'lesson-03-constitution-full.mp3' },
-    { id: 'spanish', number: '04', title: 'Испанский язык', topic: 'Испанский', file: 'lesson-04-spanish-full.mp3' },
-    { id: 'culture', number: '05', title: 'Культура Колумбии', topic: 'Культура', file: 'lesson-05-culture-full.mp3' },
-    { id: 'naturalization', number: '06', title: 'Натурализация', topic: 'Натурализация', file: 'lesson-06-naturalization-full.mp3' },
+    { id: 'geography', number: '01', title: '\u0413\u0435\u043e\u0433\u0440\u0430\u0444\u0438\u044f \u041a\u043e\u043b\u0443\u043c\u0431\u0438\u0438', topic: '\u0413\u0435\u043e\u0433\u0440\u0430\u0444\u0438\u044f', file: 'lesson-01-geography-full.mp3' },
+    { id: 'history', number: '02', title: '\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u041a\u043e\u043b\u0443\u043c\u0431\u0438\u0438', topic: '\u0418\u0441\u0442\u043e\u0440\u0438\u044f', file: 'lesson-02-history-full.mp3' },
+    { id: 'constitution', number: '03', title: '\u041a\u043e\u043d\u0441\u0442\u0438\u0442\u0443\u0446\u0438\u044f \u0438 \u0433\u043e\u0441\u0443\u0434\u0430\u0440\u0441\u0442\u0432\u043e', topic: '\u041a\u043e\u043d\u0441\u0442\u0438\u0442\u0443\u0446\u0438\u044f', file: 'lesson-03-constitution-full.mp3' },
+    { id: 'spanish', number: '04', title: '\u0418\u0441\u043f\u0430\u043d\u0441\u043a\u0438\u0439 \u044f\u0437\u044b\u043a', topic: '\u0418\u0441\u043f\u0430\u043d\u0441\u043a\u0438\u0439', file: 'lesson-04-spanish-full.mp3' },
+    { id: 'culture', number: '05', title: '\u041a\u0443\u043b\u044c\u0442\u0443\u0440\u0430 \u041a\u043e\u043b\u0443\u043c\u0431\u0438\u0438', topic: '\u041a\u0443\u043b\u044c\u0442\u0443\u0440\u0430', file: 'lesson-05-culture-full.mp3' },
+    { id: 'naturalization', number: '06', title: '\u041d\u0430\u0442\u0443\u0440\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f', topic: '\u041d\u0430\u0442\u0443\u0440\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f', file: 'lesson-06-naturalization-full.mp3' },
   ]
 
   const stateKey = 'colombia-exam-audio-library'
@@ -36,10 +50,12 @@
     .audio-library button.secondary{background:#112631;color:#dff6f6;border:1px solid #395866}
     .audio-player{display:grid;grid-template-columns:1fr;gap:10px;background:#07151c;border:1px solid #223845;border-radius:13px;margin:16px 0;padding:14px}
     .audio-player strong{font-size:15px}
-    .audio-player small{color:#9db1bd}
     .audio-player audio{width:100%}
+    .audio-current-meta{display:flex;gap:8px;flex-wrap:wrap;color:#9db1bd;font-size:12px}
+    .audio-current-meta span{border:1px solid #223845;background:#0b1b24;border-radius:999px;padding:5px 8px}
     .audio-progress-line{height:6px;background:#102734;border-radius:999px;overflow:hidden}
     .audio-progress-line i{display:block;height:100%;width:0;background:#ffd12a}
+    .audio-lessons-title{margin:16px 0 8px;color:#cfe4e8;font-size:13px;font-weight:800}
     .audio-lessons{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     .audio-lesson{border:1px solid #263b48;background:#0b1720;border-radius:11px;padding:12px;text-align:left}
     .audio-lesson b{display:block;color:#fff;font-size:14px}
@@ -83,32 +99,39 @@
     currentIndex = Number.isInteger(state.currentIndex) ? Math.min(Math.max(state.currentIndex, 0), lessons.length - 1) : currentIndex
     const current = lessons[currentIndex]
     const currentPosition = state.positions?.[current.id] || 0
+    const lessonButtons = lessons
+      .map((lesson, index) => {
+        if (index === currentIndex) return ''
+        const position = state.positions?.[lesson.id] || 0
+        const label = position ? `${text.listenFrom} ${formatTime(position)}` : text.start
+        return `<button class="audio-lesson" data-index="${index}"><b>${lesson.number}. ${lesson.title}</b><span>${lesson.topic}</span><mark>${label}</mark></button>`
+      })
+      .join('')
 
     card.innerHTML = `
       <div class="audio-library-head">
         <div>
-          <h2>Аудиотека методички</h2>
-          <p>Слушайте всю методичку подряд или отдельные модули. Позиция сохраняется в этом браузере.</p>
+          <h2>${text.title}</h2>
+          <p>${text.intro}</p>
         </div>
         <div class="audio-library-actions">
-          <button class="continue">Слушать дальше</button>
-          <button class="pause secondary">Пауза</button>
-          <button class="stop secondary">Стоп</button>
-          <button class="all secondary">Вся методичка</button>
+          <button class="continue">${text.continue}</button>
+          <button class="pause secondary">${text.pause}</button>
+          <button class="stop secondary">${text.stop}</button>
+          <button class="all secondary">${text.playAll}</button>
         </div>
       </div>
       <div class="audio-player">
         <strong>${current.number}. ${current.title}</strong>
-        <small>${current.topic} · сохранено: ${formatTime(currentPosition)}</small>
+        <div class="audio-current-meta">
+          <span>${current.topic}</span>
+          <span>${currentPosition ? `${text.saved} ${formatTime(currentPosition)}` : text.fromStart}</span>
+        </div>
         <audio controls preload="metadata" src="/audio/${current.file}"></audio>
         <div class="audio-progress-line"><i></i></div>
       </div>
-      <div class="audio-lessons">
-        ${lessons.map((lesson, index) => {
-          const position = state.positions?.[lesson.id] || 0
-          return `<button class="audio-lesson" data-index="${index}"><b>${lesson.number}. ${lesson.title}</b><span>${lesson.topic}</span><mark>${position ? `с ${formatTime(position)}` : 'начать'}</mark></button>`
-        }).join('')}
-      </div>
+      <div class="audio-lessons-title">${text.otherModules}</div>
+      <div class="audio-lessons">${lessonButtons}</div>
     `
 
     audio = card.querySelector('audio')
