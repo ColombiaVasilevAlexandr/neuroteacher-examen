@@ -8,6 +8,10 @@
 
 ## Запуск
 
+Самый простой запуск в Windows: дважды нажмите `start-neuroteacher.bat` в корне проекта.
+
+Для запуска на телефоне в той же Wi-Fi сети используйте `start-neuroteacher-lan.bat`.
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\start-neuroteacher.ps1
 ```
