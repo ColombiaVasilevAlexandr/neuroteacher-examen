@@ -11,6 +11,10 @@
     fromStart: '\u0441 \u043d\u0430\u0447\u0430\u043b\u0430',
     start: '\u043d\u0430\u0447\u0430\u0442\u044c',
     listenFrom: '\u0441\u043b\u0443\u0448\u0430\u0442\u044c \u0441',
+    ready: '\u0433\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u044e',
+    loading: '\u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0430\u0443\u0434\u0438\u043e',
+    playing: '\u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u0435',
+    blocked: '\u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043b \u0430\u0432\u0442\u043e\u0437\u0430\u043f\u0443\u0441\u043a: \u043d\u0430\u0436\u043c\u0438\u0442\u0435 Play \u0432 \u043f\u043b\u0435\u0435\u0440\u0435',
   }
 
   const lessons = [
@@ -53,6 +57,8 @@
     .audio-player audio{width:100%}
     .audio-current-meta{display:flex;gap:8px;flex-wrap:wrap;color:#9db1bd;font-size:12px}
     .audio-current-meta span{border:1px solid #223845;background:#0b1b24;border-radius:999px;padding:5px 8px}
+    .audio-status{min-height:18px;color:#9db1bd;font-size:12px}
+    .audio-status.warn{color:#ffd12a}
     .audio-progress-line{height:6px;background:#102734;border-radius:999px;overflow:hidden}
     .audio-progress-line i{display:block;height:100%;width:0;background:#ffd12a}
     .audio-lessons-title{margin:16px 0 8px;color:#cfe4e8;font-size:13px;font-weight:800}
@@ -79,7 +85,7 @@
     next.currentIndex = currentIndex
     saveState(next)
     render()
-    document.querySelector('.audio-library audio')?.play().catch(() => undefined)
+    document.querySelector('.audio-library .continue')?.click()
     document.querySelector('.audio-library')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     return true
   }
@@ -127,7 +133,8 @@
           <span>${current.topic}</span>
           <span>${currentPosition ? `${text.saved} ${formatTime(currentPosition)}` : text.fromStart}</span>
         </div>
-        <audio controls preload="metadata" src="/audio/${current.file}"></audio>
+        <audio controls preload="metadata" src="/audio/${current.file}" data-current-id="${current.id}"></audio>
+        <div class="audio-status">${text.ready}</div>
         <div class="audio-progress-line"><i></i></div>
       </div>
       <div class="audio-lessons-title">${text.otherModules}</div>
@@ -136,6 +143,22 @@
 
     audio = card.querySelector('audio')
     const bar = card.querySelector('.audio-progress-line i')
+    const status = card.querySelector('.audio-status')
+
+    function setStatus(message, warning = false) {
+      status.textContent = message
+      status.classList.toggle('warn', warning)
+    }
+
+    async function playCurrent() {
+      setStatus(text.loading)
+      try {
+        await audio.play()
+        setStatus(text.playing)
+      } catch {
+        setStatus(text.blocked, true)
+      }
+    }
 
     function persist() {
       const next = loadState()
@@ -147,6 +170,7 @@
 
     audio.addEventListener('loadedmetadata', () => {
       if (currentPosition > 0 && currentPosition < audio.duration - 3) audio.currentTime = currentPosition
+      setStatus(text.ready)
     })
     audio.addEventListener('timeupdate', () => {
       if (audio.duration) bar.style.width = `${Math.min(100, (audio.currentTime / audio.duration) * 100)}%`
@@ -164,14 +188,13 @@
       if (playAll && currentIndex < lessons.length - 1) {
         currentIndex += 1
         render()
-        const nextAudio = document.querySelector('.audio-library audio')
-        nextAudio?.play().catch(() => undefined)
+        document.querySelector('.audio-library .continue')?.click()
       }
     })
 
     card.querySelector('.continue').onclick = () => {
       playAll = false
-      audio.play().catch(() => undefined)
+      playCurrent()
     }
     card.querySelector('.pause').onclick = () => {
       playAll = false
@@ -191,7 +214,7 @@
     }
     card.querySelector('.all').onclick = () => {
       playAll = true
-      audio.play().catch(() => undefined)
+      playCurrent()
     }
     card.querySelectorAll('[data-index]').forEach((button) => {
       button.onclick = () => {
@@ -201,7 +224,8 @@
         next.currentIndex = currentIndex
         saveState(next)
         render()
-        document.querySelector('.audio-library audio')?.play().catch(() => undefined)
+        const nextCard = document.querySelector('.audio-library')
+        nextCard?.querySelector('.continue')?.click()
       }
     })
   }
