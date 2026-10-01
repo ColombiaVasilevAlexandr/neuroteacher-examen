@@ -3,6 +3,13 @@
   const labels = ['Español','Русский','English','Deutsch','Français','简体中文'];
   let current = ids.includes(localStorage.getItem('neuroteacher-language')) ? localStorage.getItem('neuroteacher-language') : 'es';
   const rows = [
+    ["Pregunta en español", "Вопрос на испанском", "Question in Spanish", "Frage auf Spanisch", "Question en espagnol", "西班牙语问题"],
+    ["Pregunta traducida · original debajo", "Перевод вопроса · оригинал ниже", "Translated question · original below", "Übersetzte Frage · Original unten", "Question traduite · original ci-dessous", "译文问题 · 原文如下"],
+    ["PREGUNTA · SIN PISTAS", "ВОПРОС · БЕЗ ПОДСКАЗОК", "QUESTION · NO HINTS", "FRAGE · OHNE HINWEISE", "QUESTION · SANS INDICES", "问题 · 无提示"],
+    ["Correcto.", "Верно.", "Correct.", "Richtig.", "Correct.", "正确。"],
+    ["Incorrecto.", "Неверно.", "Incorrect.", "Falsch.", "Incorrect.", "错误。"],
+    ["Siguiente pregunta →", "Следующий вопрос →", "Next question →", "Nächste Frage →", "Question suivante →", "下一题 →"],
+
     ['Hoy','Сегодня','Today','Heute',"Aujourd’hui",'今天'],
     ['Aprender','Изучение','Learn','Lernen','Apprendre','学习'],
     ['Entrenamiento','Тренировка','Practice','Üben','Entraînement','练习'],
