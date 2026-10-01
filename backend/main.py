@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from question_locales import Locale, LOCALES, LOCALE_LABELS, localize_questions
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
@@ -131,6 +132,7 @@ class Answer(BaseModel):
 class ExamStart(BaseModel):
     model_config = ConfigDict(extra="forbid")
     exam_format: Literal["D", "B"]
+    locale: Locale = "es"
 
 class ExamAnswer(Answer):
     model_config = ConfigDict(extra="forbid")
@@ -268,6 +270,10 @@ def module_name(topic: str) -> str:
         return "Натурализация"
     return "Микротемы"
 
+@app.get('/api/locales')
+def locales():
+    return [{'id': locale, 'label': label} for locale, label in zip(LOCALES, LOCALE_LABELS)]
+
 @app.get('/api/health')
 def health(): return {"status": "ok"}
 
@@ -292,7 +298,7 @@ async def consultant_speech(payload: SpeechRequest):
         raise HTTPException(502, "Speech service is unavailable")
 
 @app.get('/api/questions')
-def questions(limit: int = 20, topic: str | None = None, exclude: str | None = None):
+def questions(limit: int = 20, topic: str | None = None, exclude: str | None = None, locale: Locale = 'es'):
     excluded_ids = [int(value) for value in (exclude or '').split(',') if value.strip().isdigit()]
     excluded_sql = f" AND id NOT IN ({','.join('?' for _ in excluded_ids)})" if excluded_ids else ''
     filters = admitted_questions() + excluded_sql
@@ -305,7 +311,7 @@ def questions(limit: int = 20, topic: str | None = None, exclude: str | None = N
             rows = db.execute(f"SELECT {fields} FROM questions WHERE {filters} AND topic=? ORDER BY RANDOM() LIMIT ?", (*excluded_ids, topic, limit)).fetchall()
         else:
             rows = db.execute(f"SELECT {fields} FROM questions WHERE {filters} ORDER BY RANDOM() LIMIT ?", (*excluded_ids, limit)).fetchall()
-    return [dict(r) for r in rows]
+    return localize_questions(db, rows, locale)
 
 @app.get('/api/study-plan')
 def study_plan(exam_date: date | None = None):
@@ -418,7 +424,7 @@ def save_study_plan(payload: StudyPlanSettings):
     return study_plan(payload.exam_date)
 
 @app.get('/api/study-plan/questions')
-def study_plan_questions(limit: int = 20):
+def study_plan_questions(limit: int = 20, locale: Locale = 'es'):
     """Return due reviews first, then questions never answered by the learner."""
     limit = min(max(limit, 1), 50)
     fields = 'id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page'
@@ -430,7 +436,7 @@ def study_plan_questions(limit: int = 20):
         fresh = [] if remaining == 0 else db.execute(f'''SELECT {fields} FROM questions q
             WHERE {admitted_questions("q")} AND NOT EXISTS (SELECT 1 FROM attempts a WHERE a.question_id=q.id)
             ORDER BY RANDOM() LIMIT ?''', (remaining,)).fetchall()
-    return {"questions": [dict(row) for row in [*due, *fresh]], "due_reviews": len(due), "new_questions": len(fresh)}
+    return {"questions": localize_questions(db, [*due, *fresh], locale), "due_reviews": len(due), "new_questions": len(fresh)}
 
 @app.post('/api/questions/generate')
 def generate_questions(payload: QuestionGenerationRequest):
@@ -520,16 +526,19 @@ def record_attempt(db, question_id: int, answer_value: str, correct: bool, respo
     db.execute("INSERT INTO review_queue(question_id,due_at,step) VALUES(?,?,?) ON CONFLICT(question_id) DO UPDATE SET due_at=excluded.due_at, step=excluded.step", (question_id, due, step))
 
 @app.post('/api/questions/{question_id}/answer')
-def answer(question_id: int, payload: Answer):
+def answer(question_id: int, payload: Answer, locale: Locale = 'es'):
     with conn() as db:
-        q = db.execute(f"SELECT correct_answer, explanation_es, explanation_ru FROM questions WHERE id=? AND {admitted_questions()}", (question_id,)).fetchone()
+        q = db.execute(f"SELECT id, correct_answer, explanation_es, explanation_ru FROM questions WHERE id=? AND {admitted_questions()}", (question_id,)).fetchone()
         if not q: raise HTTPException(404, "Question not found")
         correct = payload.answer.upper() == q['correct_answer']
         record_attempt(db, question_id, payload.answer, correct, payload.response_time_seconds)
-    return {"correct": correct, "correct_answer": q['correct_answer'], "explanation_es": q['explanation_es'], "explanation_ru": q['explanation_ru']}
+    result = localize_questions(db, [q], locale)[0]
+    result.pop("id", None)
+    result["correct"] = correct
+    return result
 
 @app.post('/api/exams/start')
-def start_exam(payload: ExamStart):
+def start_exam(payload: ExamStart, locale: Locale | None = None):
     config = EXAM_FORMATS[payload.exam_format]
     token = secrets.token_urlsafe(32)
     started_at = datetime.now(timezone.utc).isoformat()
@@ -542,6 +551,7 @@ def start_exam(payload: ExamStart):
         db.execute("INSERT INTO exam_runs(token,exam_format,started_at) VALUES(?,?,?)",
                    (token, payload.exam_format, started_at))
         questions = []
+        rows = localize_questions(db, rows, locale or payload.locale)
         for position, row in enumerate(rows):
             question = dict(row)
             key = question.pop("correct_answer")
@@ -694,17 +704,17 @@ def material_chapters():
     ]
 
 @app.get('/api/errors')
-def errors():
+def errors(locale: Locale = 'es'):
     with conn() as db:
         rows = db.execute(f'''
             SELECT q.id, q.question_es, q.topic, q.explanation_es, COUNT(a.id) AS error_count
             FROM attempts a JOIN questions q ON q.id=a.question_id
             WHERE a.correct=0 AND {admitted_questions("q")} GROUP BY q.id ORDER BY error_count DESC, q.id
         ''').fetchall()
-    return [dict(row) for row in rows]
+    return localize_questions(db, rows, locale)
 
 @app.get('/api/attempts')
-def attempts(correct_only: bool = False, limit: int = 50):
+def attempts(correct_only: bool = False, limit: int = 50, locale: Locale = 'es'):
     where = " AND a.correct=1" if correct_only else ""
     with conn() as db:
         rows = db.execute(f'''
@@ -713,20 +723,20 @@ def attempts(correct_only: bool = False, limit: int = 50):
             FROM attempts a JOIN questions q ON q.id=a.question_id
             WHERE {admitted_questions("q")}{where} ORDER BY a.id DESC LIMIT ?
         ''', (min(max(limit, 1), 200),)).fetchall()
-    return [dict(row) for row in rows]
+    return localize_questions(db, rows, locale)
 
 @app.get('/api/explanations')
-def explanations():
+def explanations(locale: Locale = 'es'):
     with conn() as db:
         rows = db.execute(f'''
             SELECT id, question_es, topic, correct_answer, explanation_es,
                    status, source_page
             FROM questions WHERE {admitted_questions()} ORDER BY topic, id
         ''').fetchall()
-    return [dict(row) for row in rows]
+    return localize_questions(db, rows, locale)
 
 @app.get('/api/bookmarks')
-def bookmarks():
+def bookmarks(locale: Locale = 'es'):
     with conn() as db:
         rows = db.execute(f'''
             SELECT q.id, q.question_es, q.topic, b.created_at
@@ -734,10 +744,10 @@ def bookmarks():
             WHERE {admitted_questions("q")}
             ORDER BY b.created_at DESC
         ''').fetchall()
-    return [dict(row) for row in rows]
+    return localize_questions(db, rows, locale)
 
 @app.get('/api/review/due')
-def due_reviews(limit: int = 20):
+def due_reviews(limit: int = 20, locale: Locale = 'es'):
     with conn() as db:
         rows = db.execute(f'''
             SELECT q.id,q.question_es,q.question_ru,q.answer_a,q.answer_a_ru,q.answer_b,q.answer_b_ru,
@@ -746,7 +756,7 @@ def due_reviews(limit: int = 20):
             WHERE {admitted_questions("q")} AND date(r.due_at) <= date('now','localtime')
             ORDER BY r.due_at, q.id LIMIT ?
         ''', (min(max(limit, 1), 50),)).fetchall()
-    return [dict(row) for row in rows]
+    return localize_questions(db, rows, locale)
 
 @app.post('/api/bookmarks/{question_id}')
 def add_bookmark(question_id: int):

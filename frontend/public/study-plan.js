@@ -72,7 +72,7 @@
         modal.querySelector('.close').onclick = () => modal.remove()
         return
       }
-      modal.innerHTML = `<article><button class="close">Закрыть</button><p class="study-plan-muted">Вопрос ${index + 1} из ${data.questions.length} · ${ruTopic(question.topic)}</p><h2>${question.question_ru || question.question_es}</h2>${['A', 'B', 'C', 'D'].map((key) => `<button data-answer="${key}"><b>${key}.</b> ${question[`answer_${key.toLowerCase()}_ru`] || question[`answer_${key.toLowerCase()}`]}</button>`).join('')}</article>`
+      modal.innerHTML = `<article><button class="close">Закрыть</button><p class="study-plan-muted">Вопрос ${index + 1} из ${data.questions.length} · ${ruTopic(question.topic)}</p><h2>${window.ColombiaLocales.escape(question.display_question || question.question_es)}</h2>${question.translation_available === false && question.requested_locale !== 'es' ? `<p role="status">${window.ColombiaLocales.escape(window.ColombiaLocales.fallback())}</p>` : ''}${['A', 'B', 'C', 'D'].map((key) => `<button data-answer="${key}"><b>${key}.</b> ${window.ColombiaLocales.escape(question.display_options?.[key] || question[`answer_${key.toLowerCase()}`])}</button>`).join('')}</article>`
       modal.querySelector('.close').onclick = () => modal.remove()
       modal.querySelectorAll('[data-answer]').forEach((button) => {
         button.onclick = async () => {
@@ -88,7 +88,7 @@
   }
 
   function clickNav(pattern) {
-    const button = [...document.querySelectorAll('.nav')].find((item) => pattern.test(item.textContent))
+    const button = [...document.querySelectorAll('.nav')].find((item) => pattern.test(item.dataset.nav || '') || pattern.test(item.textContent))
     if (button) {
       button.click()
       return true

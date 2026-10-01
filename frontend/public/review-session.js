@@ -10,8 +10,8 @@
       const show = () => {
         const q = questions[index]
         if (!q) { session.innerHTML='<div class="review-done"><b>✓</b><h2>Повторение завершено</h2><p>Следующая очередь появится в назначенный день.</p></div>'; return }
-        const answers = ['A','B','C','D'].map(key => `<button data-answer="${key}"><b>${key}</b>${q[`answer_${key.toLowerCase()}_ru`] || q[`answer_${key.toLowerCase()}`]}</button>`).join('')
-        session.innerHTML = `<small>ПОВТОРЕНИЕ ${index + 1} ИЗ ${questions.length}</small><h1>${q.question_ru || q.question_es}</h1><p class="review-original">ES: ${q.question_es}</p><div class="review-answers">${answers}</div><p class="review-result"></p>`
+        const answers = ['A','B','C','D'].map(key => `<button data-answer="${key}"><b>${key}</b>${window.ColombiaLocales.escape(q.display_options?.[key] || q[`answer_${key.toLowerCase()}`])}</button>`).join('')
+        session.innerHTML = `<small>ПОВТОРЕНИЕ ${index + 1} ИЗ ${questions.length}</small><h1>${window.ColombiaLocales.escape(q.display_question || q.question_es)}</h1>${q.translation_available === false && q.requested_locale !== 'es' ? `<p role="status">${window.ColombiaLocales.escape(window.ColombiaLocales.fallback())}</p>` : ''}<p class="review-original">ES: ${q.question_es}</p><div class="review-answers">${answers}</div><p class="review-result"></p>`
         session.querySelectorAll('[data-answer]').forEach(button => button.onclick = async () => {
           const response = await fetch(`${API}/questions/${q.id}/answer`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answer:button.dataset.answer})})
           const result = await response.json(); const note = session.querySelector('.review-result')
