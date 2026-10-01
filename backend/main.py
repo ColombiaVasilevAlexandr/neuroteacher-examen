@@ -44,6 +44,12 @@ QUESTIONS = [
     ("¿Qué área aparece entre los conocimientos evaluados en el examen?", "Constitución Política", "Programación", "Física cuántica", "Diseño industrial", "A", "Naturalización", "Cancillería menciona Constitución, historia, geografía, cultura y castellano."),
 ]
 
+# Keep the existing admission policy shared by every student question route.
+QUESTION_ADMISSION_SQL = "status IN ('reviewed','verified','ai_reviewed')"
+
+def admitted_questions(alias: str = "") -> str:
+    return (alias + "." if alias else "") + QUESTION_ADMISSION_SQL
+
 def conn():
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
@@ -260,7 +266,7 @@ async def consultant_speech(payload: SpeechRequest):
 def questions(limit: int = 20, topic: str | None = None, exclude: str | None = None):
     excluded_ids = [int(value) for value in (exclude or '').split(',') if value.strip().isdigit()]
     excluded_sql = f" AND id NOT IN ({','.join('?' for _ in excluded_ids)})" if excluded_ids else ''
-    filters = "status IN ('reviewed','verified','ai_reviewed')" + excluded_sql
+    filters = admitted_questions() + excluded_sql
     fields = "id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page"
     with conn() as db:
         if topic and topic in MODULE_ORDER:
@@ -285,12 +291,12 @@ def study_plan(exam_date: date | None = None):
         if days_left < 1:
             raise HTTPException(400, "Exam date must be in the future")
 
-        allowed = "('reviewed','verified','ai_reviewed')"
-        total = db.execute(f"SELECT COUNT(*) FROM questions WHERE status IN {allowed}").fetchone()[0]
+        allowed = admitted_questions()
+        total = db.execute(f"SELECT COUNT(*) FROM questions WHERE {allowed}").fetchone()[0]
         unseen = db.execute(f'''SELECT COUNT(*) FROM questions q
-            WHERE q.status IN {allowed} AND NOT EXISTS (SELECT 1 FROM attempts a WHERE a.question_id=q.id)''').fetchone()[0]
+            WHERE {admitted_questions("q")} AND NOT EXISTS (SELECT 1 FROM attempts a WHERE a.question_id=q.id)''').fetchone()[0]
         due = db.execute(f'''SELECT COUNT(*) FROM review_queue r JOIN questions q ON q.id=r.question_id
-            WHERE q.status IN {allowed} AND date(r.due_at) <= date('now','localtime')''').fetchone()[0]
+            WHERE {admitted_questions("q")} AND date(r.due_at) <= date('now','localtime')''').fetchone()[0]
         daily_new = max(1, (unseen + days_left - 1) // days_left) if unseen else 0
         daily_reviews = min(due, max(5, daily_new // 2))
 
@@ -298,7 +304,7 @@ def study_plan(exam_date: date | None = None):
             COUNT(DISTINCT CASE WHEN NOT EXISTS (SELECT 1 FROM attempts a WHERE a.question_id=q.id) THEN q.id END) AS unseen,
             ROUND(100.0 * AVG(CASE WHEN a.correct IS NULL THEN NULL ELSE a.correct END)) AS score
             FROM questions q LEFT JOIN attempts a ON a.question_id=q.id
-            WHERE q.status IN {allowed} GROUP BY q.topic ORDER BY q.topic''').fetchall()
+            WHERE {admitted_questions("q")} GROUP BY q.topic ORDER BY q.topic''').fetchall()
     topics = []
     for row in topic_rows:
         if row['unseen']:
@@ -333,10 +339,10 @@ def today_study_plan(exam_date: date | None = None):
 
     modules = {name: {"module": name, "available": 0, "unseen": 0, "priority": 1.0} for name in MODULE_ORDER}
     with conn() as db:
-        all_topics = db.execute("""
+        all_topics = db.execute(f"""
             SELECT topic, COUNT(*) AS available
             FROM questions
-            WHERE status IN ('reviewed','verified','ai_reviewed')
+            WHERE {admitted_questions()}
             GROUP BY topic
         """).fetchall()
     for item in all_topics:
@@ -386,15 +392,14 @@ def save_study_plan(payload: StudyPlanSettings):
 def study_plan_questions(limit: int = 20):
     """Return due reviews first, then questions never answered by the learner."""
     limit = min(max(limit, 1), 50)
-    allowed = "('reviewed','verified','ai_reviewed')"
     fields = 'id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page'
     with conn() as db:
         due = db.execute(f'''SELECT q.{fields} FROM review_queue r JOIN questions q ON q.id=r.question_id
-            WHERE q.status IN {allowed} AND date(r.due_at) <= date('now','localtime')
+            WHERE {admitted_questions("q")} AND date(r.due_at) <= date('now','localtime')
             ORDER BY r.due_at, q.id LIMIT ?''', (limit,)).fetchall()
         remaining = limit - len(due)
         fresh = [] if remaining == 0 else db.execute(f'''SELECT {fields} FROM questions q
-            WHERE q.status IN {allowed} AND NOT EXISTS (SELECT 1 FROM attempts a WHERE a.question_id=q.id)
+            WHERE {admitted_questions("q")} AND NOT EXISTS (SELECT 1 FROM attempts a WHERE a.question_id=q.id)
             ORDER BY RANDOM() LIMIT ?''', (remaining,)).fetchall()
     return {"questions": [dict(row) for row in [*due, *fresh]], "due_reviews": len(due), "new_questions": len(fresh)}
 
@@ -465,7 +470,7 @@ Official source, page {payload.page_number}:
 @app.get('/api/exams/formats')
 def exam_formats():
     with conn() as db:
-        available = db.execute("SELECT COUNT(*) FROM questions WHERE status IN ('reviewed','verified','ai_reviewed')").fetchone()[0]
+        available = db.execute(f"SELECT COUNT(*) FROM questions WHERE {admitted_questions()}").fetchone()[0]
         verified = db.execute("SELECT COUNT(*) FROM questions WHERE status='verified'").fetchone()[0]
     return {
         "available_questions": available,
@@ -479,7 +484,7 @@ def exam_formats():
 @app.post('/api/questions/{question_id}/answer')
 def answer(question_id: int, payload: Answer):
     with conn() as db:
-        q = db.execute("SELECT correct_answer, explanation_es, explanation_ru FROM questions WHERE id=?", (question_id,)).fetchone()
+        q = db.execute(f"SELECT correct_answer, explanation_es, explanation_ru FROM questions WHERE id=? AND {admitted_questions()}", (question_id,)).fetchone()
         if not q: raise HTTPException(404, "Question not found")
         correct = payload.answer.upper() == q['correct_answer']
         db.execute("INSERT INTO attempts(question_id,answer,correct,response_time_seconds) VALUES(?,?,?,?)", (question_id, payload.answer.upper(), correct, payload.response_time_seconds))
@@ -545,14 +550,15 @@ def dashboard():
         correct = db.execute("SELECT COUNT(*) FROM attempts WHERE correct=1").fetchone()[0]
         average_time = db.execute("SELECT AVG(response_time_seconds) FROM attempts WHERE response_time_seconds IS NOT NULL").fetchone()[0]
         exams = db.execute("SELECT COUNT(*) FROM exam_sessions").fetchone()[0]
-        due_reviews = db.execute("SELECT COUNT(*) FROM review_queue WHERE date(due_at) <= date('now','localtime')").fetchone()[0]
+        due_reviews = db.execute(f"SELECT COUNT(*) FROM review_queue r JOIN questions q ON q.id=r.question_id WHERE {admitted_questions('q')} AND date(r.due_at) <= date('now','localtime')").fetchone()[0]
         active_days = {date.fromisoformat(row[0]) for row in db.execute("SELECT DISTINCT date(created_at, 'localtime') FROM attempts")}
-        recent = [dict(row) for row in db.execute('''
+        recent = [dict(row) for row in db.execute(f'''
             SELECT q.question_es, q.topic, a.correct, a.created_at
             FROM attempts a JOIN questions q ON q.id=a.question_id
+            WHERE {admitted_questions("q")}
             ORDER BY a.id DESC LIMIT 5
         ''').fetchall()]
-        raw_topic_counts = [dict(row) for row in db.execute("SELECT topic, COUNT(*) AS count FROM questions WHERE status IN ('reviewed','verified','ai_reviewed') GROUP BY topic ORDER BY count DESC").fetchall()]
+        raw_topic_counts = [dict(row) for row in db.execute(f"SELECT topic, COUNT(*) AS count FROM questions WHERE {admitted_questions()} GROUP BY topic ORDER BY count DESC").fetchall()]
         module_counts = {name: 0 for name in MODULE_ORDER}
         for row in raw_topic_counts:
             module_counts[module_name(row["topic"])] += row["count"]
@@ -597,41 +603,42 @@ def material_chapters():
 @app.get('/api/errors')
 def errors():
     with conn() as db:
-        rows = db.execute('''
+        rows = db.execute(f'''
             SELECT q.id, q.question_es, q.topic, q.explanation_es, COUNT(a.id) AS error_count
             FROM attempts a JOIN questions q ON q.id=a.question_id
-            WHERE a.correct=0 GROUP BY q.id ORDER BY error_count DESC, q.id
+            WHERE a.correct=0 AND {admitted_questions("q")} GROUP BY q.id ORDER BY error_count DESC, q.id
         ''').fetchall()
     return [dict(row) for row in rows]
 
 @app.get('/api/attempts')
 def attempts(correct_only: bool = False, limit: int = 50):
-    where = "WHERE a.correct=1" if correct_only else ""
+    where = " AND a.correct=1" if correct_only else ""
     with conn() as db:
         rows = db.execute(f'''
             SELECT a.id, q.id AS question_id, q.question_es, q.topic, a.answer, a.correct,
                    a.response_time_seconds, a.created_at
             FROM attempts a JOIN questions q ON q.id=a.question_id
-            {where} ORDER BY a.id DESC LIMIT ?
+            WHERE {admitted_questions("q")}{where} ORDER BY a.id DESC LIMIT ?
         ''', (min(max(limit, 1), 200),)).fetchall()
     return [dict(row) for row in rows]
 
 @app.get('/api/explanations')
 def explanations():
     with conn() as db:
-        rows = db.execute('''
+        rows = db.execute(f'''
             SELECT id, question_es, topic, correct_answer, explanation_es,
                    status, source_page
-            FROM questions ORDER BY topic, id
+            FROM questions WHERE {admitted_questions()} ORDER BY topic, id
         ''').fetchall()
     return [dict(row) for row in rows]
 
 @app.get('/api/bookmarks')
 def bookmarks():
     with conn() as db:
-        rows = db.execute('''
+        rows = db.execute(f'''
             SELECT q.id, q.question_es, q.topic, b.created_at
             FROM bookmarks b JOIN questions q ON q.id=b.question_id
+            WHERE {admitted_questions("q")}
             ORDER BY b.created_at DESC
         ''').fetchall()
     return [dict(row) for row in rows]
@@ -639,11 +646,11 @@ def bookmarks():
 @app.get('/api/review/due')
 def due_reviews(limit: int = 20):
     with conn() as db:
-        rows = db.execute('''
+        rows = db.execute(f'''
             SELECT q.id,q.question_es,q.question_ru,q.answer_a,q.answer_a_ru,q.answer_b,q.answer_b_ru,
                    q.answer_c,q.answer_c_ru,q.answer_d,q.answer_d_ru,q.topic,q.source_page,r.due_at
             FROM review_queue r JOIN questions q ON q.id=r.question_id
-            WHERE date(r.due_at) <= date('now','localtime')
+            WHERE {admitted_questions("q")} AND date(r.due_at) <= date('now','localtime')
             ORDER BY r.due_at, q.id LIMIT ?
         ''', (min(max(limit, 1), 50),)).fetchall()
     return [dict(row) for row in rows]
@@ -651,7 +658,7 @@ def due_reviews(limit: int = 20):
 @app.post('/api/bookmarks/{question_id}')
 def add_bookmark(question_id: int):
     with conn() as db:
-        exists = db.execute("SELECT 1 FROM questions WHERE id=?", (question_id,)).fetchone()
+        exists = db.execute(f"SELECT 1 FROM questions WHERE id=? AND {admitted_questions()}", (question_id,)).fetchone()
         if not exists: raise HTTPException(404, "Question not found")
         db.execute("INSERT OR IGNORE INTO bookmarks(question_id) VALUES(?)", (question_id,))
         db.execute("INSERT OR IGNORE INTO review_queue(question_id,due_at,step) VALUES(?,date('now','localtime'),0)", (question_id,))
@@ -666,10 +673,11 @@ def delete_bookmark(question_id: int):
 @app.get('/api/topics/weak')
 def weak_topics():
     with conn() as db:
-        rows = db.execute('''
+        rows = db.execute(f'''
             SELECT q.topic, COUNT(a.id) AS attempts,
             ROUND(100.0 * SUM(a.correct) / COUNT(a.id)) AS score
             FROM attempts a JOIN questions q ON q.id=a.question_id
+            WHERE {admitted_questions("q")}
             GROUP BY q.topic HAVING COUNT(a.id) > 0
             ORDER BY score ASC, attempts DESC LIMIT 5
         ''').fetchall()
