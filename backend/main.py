@@ -1,10 +1,13 @@
 from contextlib import asynccontextmanager
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
 import os
 import json
 import re
+import hashlib
+import secrets
+import math
 import edge_tts
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
@@ -12,7 +15,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from pydantic import BaseModel
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
@@ -68,6 +72,14 @@ def initialize():
         CREATE TABLE IF NOT EXISTS bookmarks (question_id INTEGER PRIMARY KEY, created_at TEXT DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(question_id) REFERENCES questions(id));
         CREATE TABLE IF NOT EXISTS review_queue (question_id INTEGER PRIMARY KEY, due_at TEXT NOT NULL, step INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(question_id) REFERENCES questions(id));
         CREATE TABLE IF NOT EXISTS study_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS exam_runs (
+            token TEXT PRIMARY KEY, exam_format TEXT NOT NULL, started_at TEXT NOT NULL,
+            submission_sha256 TEXT, result_json TEXT);
+        CREATE TABLE IF NOT EXISTS exam_run_questions (
+            run_token TEXT NOT NULL, question_id INTEGER NOT NULL, position INTEGER NOT NULL,
+            correct_answer TEXT NOT NULL, question_json TEXT NOT NULL,
+            PRIMARY KEY(run_token,question_id), UNIQUE(run_token,position),
+            FOREIGN KEY(run_token) REFERENCES exam_runs(token));
         ''')
         try:
             db.execute("ALTER TABLE attempts ADD COLUMN response_time_seconds REAL")
@@ -108,14 +120,31 @@ app.add_middleware(
 )
 
 class Answer(BaseModel):
-    answer: str
-    response_time_seconds: float | None = None
+    answer: Literal["A", "B", "C", "D"]
+    response_time_seconds: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+    @field_validator("answer", mode="before")
+    @classmethod
+    def uppercase_answer(cls, value):
+        return value.upper() if isinstance(value, str) else value
+
+class ExamStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    exam_format: Literal["D", "B"]
+
+class ExamAnswer(Answer):
+    model_config = ConfigDict(extra="forbid")
+    question_id: int = Field(gt=0, strict=True)
 
 class ExamResult(BaseModel):
-    total_questions: int
-    correct_answers: int
-    exam_format: str = "practice"
-    duration_seconds: int | None = None
+    model_config = ConfigDict(extra="forbid")
+    session_id: str = Field(min_length=1, max_length=128)
+    answers: list[ExamAnswer] = Field(max_length=75)
+
+EXAM_FORMATS = {
+    "D": {"id": "D", "questions": 65, "passing_score": 32, "minutes": 180, "includes_spanish": False},
+    "B": {"id": "B", "questions": 75, "passing_score": 37, "minutes": 240, "includes_spanish": True},
+}
 
 class ChatMessage(BaseModel):
     role: str
@@ -475,11 +504,20 @@ def exam_formats():
     return {
         "available_questions": available,
         "verified_questions": verified,
-        "formats": [
-            {"id": "D", "questions": 65, "passing_score": 32, "minutes": 180, "includes_spanish": False},
-            {"id": "B", "questions": 75, "passing_score": 37, "minutes": 240, "includes_spanish": True},
-        ],
+        "formats": list(EXAM_FORMATS.values()),
     }
+
+def record_attempt(db, question_id: int, answer_value: str, correct: bool, response_time_seconds=None):
+    db.execute("INSERT INTO attempts(question_id,answer,correct,response_time_seconds) VALUES(?,?,?,?)",
+               (question_id, answer_value, correct, response_time_seconds))
+    existing = db.execute("SELECT step FROM review_queue WHERE question_id=?", (question_id,)).fetchone()
+    if correct:
+        step = min((existing['step'] if existing else -1) + 1, 4)
+        days = (1, 3, 7, 14, 30)[step]
+    else:
+        step, days = 0, 1
+    due = (date.today() + timedelta(days=days)).isoformat()
+    db.execute("INSERT INTO review_queue(question_id,due_at,step) VALUES(?,?,?) ON CONFLICT(question_id) DO UPDATE SET due_at=excluded.due_at, step=excluded.step", (question_id, due, step))
 
 @app.post('/api/questions/{question_id}/answer')
 def answer(question_id: int, payload: Answer):
@@ -487,22 +525,77 @@ def answer(question_id: int, payload: Answer):
         q = db.execute(f"SELECT correct_answer, explanation_es, explanation_ru FROM questions WHERE id=? AND {admitted_questions()}", (question_id,)).fetchone()
         if not q: raise HTTPException(404, "Question not found")
         correct = payload.answer.upper() == q['correct_answer']
-        db.execute("INSERT INTO attempts(question_id,answer,correct,response_time_seconds) VALUES(?,?,?,?)", (question_id, payload.answer.upper(), correct, payload.response_time_seconds))
-        existing = db.execute("SELECT step FROM review_queue WHERE question_id=?", (question_id,)).fetchone()
-        if correct:
-            step = min((existing['step'] if existing else -1) + 1, 4)
-            days = (1, 3, 7, 14, 30)[step]
-        else:
-            step, days = 0, 1
-        due = (date.today() + timedelta(days=days)).isoformat()
-        db.execute("INSERT INTO review_queue(question_id,due_at,step) VALUES(?,?,?) ON CONFLICT(question_id) DO UPDATE SET due_at=excluded.due_at, step=excluded.step", (question_id, due, step))
+        record_attempt(db, question_id, payload.answer, correct, payload.response_time_seconds)
     return {"correct": correct, "correct_answer": q['correct_answer'], "explanation_es": q['explanation_es'], "explanation_ru": q['explanation_ru']}
+
+@app.post('/api/exams/start')
+def start_exam(payload: ExamStart):
+    config = EXAM_FORMATS[payload.exam_format]
+    token = secrets.token_urlsafe(32)
+    started_at = datetime.now(timezone.utc).isoformat()
+    fields = "id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,topic,status,source_page,correct_answer"
+    with conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        rows = db.execute(f"SELECT {fields} FROM questions WHERE {admitted_questions()} ORDER BY RANDOM() LIMIT ?", (config["questions"],)).fetchall()
+        if not rows:
+            raise HTTPException(409, "No admitted questions available")
+        db.execute("INSERT INTO exam_runs(token,exam_format,started_at) VALUES(?,?,?)",
+                   (token, payload.exam_format, started_at))
+        questions = []
+        for position, row in enumerate(rows):
+            question = dict(row)
+            key = question.pop("correct_answer")
+            db.execute("INSERT INTO exam_run_questions VALUES(?,?,?,?,?)",
+                       (token, question["id"], position, key, json.dumps(question, ensure_ascii=False)))
+            questions.append(question)
+    return {"session_id": token, "exam_format": payload.exam_format, "started_at": started_at,
+            "total_questions": len(questions), "minutes": config["minutes"], "questions": questions}
 
 @app.post('/api/exams/complete')
 def complete_exam(payload: ExamResult):
+    answers = {item.question_id: item for item in payload.answers}
+    if len(answers) != len(payload.answers):
+        raise HTTPException(422, "Duplicate question IDs")
+    canonical = json.dumps([item.model_dump() for item in sorted(payload.answers, key=lambda a: a.question_id)], sort_keys=True, separators=(",", ":"))
+    submission_sha256 = hashlib.sha256(canonical.encode()).hexdigest()
     with conn() as db:
-        cursor = db.execute("INSERT INTO exam_sessions(total_questions,correct_answers) VALUES(?,?)", (payload.total_questions, payload.correct_answers))
-    return {"id": cursor.lastrowid, "saved": True}
+        # Serialize completion and retries so history and results are saved once.
+        db.execute("BEGIN IMMEDIATE")
+        run = db.execute("SELECT * FROM exam_runs WHERE token=?", (payload.session_id,)).fetchone()
+        if not run:
+            raise HTTPException(404, "Exam session not found")
+        if run["result_json"]:
+            if run["submission_sha256"] != submission_sha256:
+                raise HTTPException(409, "Exam session already completed with different answers")
+            return json.loads(run["result_json"])
+        selected = db.execute(f"""SELECT s.question_id,s.correct_answer,q.id AS admitted_id
+            FROM exam_run_questions s LEFT JOIN questions q ON q.id=s.question_id AND {admitted_questions("q")}
+            WHERE s.run_token=? ORDER BY s.position""", (payload.session_id,)).fetchall()
+        selected_ids = {row["question_id"] for row in selected}
+        if not selected or not set(answers).issubset(selected_ids):
+            raise HTTPException(422, "Answer contains a question outside this exam session")
+        if any(row["admitted_id"] is None for row in selected):
+            raise HTTPException(409, "A question in this exam session is no longer admitted")
+        correct_answers = 0
+        for row in selected:
+            item = answers.get(row["question_id"])
+            if item is None:
+                continue  # Unanswered questions remain in the denominator.
+            correct = item.answer == row["correct_answer"]
+            correct_answers += int(correct)
+            record_attempt(db, item.question_id, item.answer, correct, item.response_time_seconds)
+        cursor = db.execute("INSERT INTO exam_sessions(total_questions,correct_answers) VALUES(?,?)",
+                            (len(selected), correct_answers))
+        duration_seconds = max(0, int((datetime.now(timezone.utc) - datetime.fromisoformat(run["started_at"])).total_seconds()))
+        config = EXAM_FORMATS[run["exam_format"]]
+        passing_score = math.ceil(len(selected) * config["passing_score"] / config["questions"])
+        result = {"id": cursor.lastrowid, "saved": True, "total_questions": len(selected),
+                  "correct_answers": correct_answers, "exam_format": run["exam_format"],
+                  "duration_seconds": duration_seconds, "passing_score": passing_score,
+                  "passed": correct_answers >= passing_score}
+        db.execute("UPDATE exam_runs SET submission_sha256=?,result_json=? WHERE token=?",
+                   (submission_sha256, json.dumps(result), payload.session_id))
+    return result
 
 @app.get('/api/ai/status')
 def ai_status():
