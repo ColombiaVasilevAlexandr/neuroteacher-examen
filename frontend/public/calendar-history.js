@@ -1,52 +1,32 @@
 (() => {
-  const style = document.createElement('style')
-  style.textContent = `
-    .streak .week { gap: 8px; overflow-x: auto; justify-content: flex-start; padding: 6px 2px 10px; scrollbar-width: thin; }
-    .streak .week > div { flex: 0 0 36px; }
-    .streak .week > div.current { margin-top: 0; }
-    .streak .week > div[data-has-activity="true"] i { color: #55e980; border-color: #48d976; }
-    .streak .week > div[data-has-activity="false"] i { color: #334357; border-color: #334357; }
-  `
-  document.head.append(style)
-
-  const render = async () => {
-    const week = document.querySelector('.streak .week')
-    if (!week || week.dataset.historyLoaded) return
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/dashboard')
-      const dashboard = await response.json()
-      if (!Array.isArray(dashboard.calendar)) return
-      week.dataset.historyLoaded = 'true'
-      week.replaceChildren(...dashboard.calendar.map(({ date, attempts }) => {
-        const item = document.createElement('div')
-        const current = date === dashboard.calendar.at(-1)?.date
-        if (current) item.className = 'current'
-        item.dataset.hasActivity = String(attempts > 0)
-        const label = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(`${date}T12:00:00`))
-        item.innerHTML = `<b>${label}</b><i title="${attempts} занятий">${attempts > 0 ? '✓' : '·'}</i>`
-        return item
-      }))
-      const chart = document.querySelector('.preparation .chart')
-      if (chart) {
-        const points = dashboard.calendar.map(({ score }, index) => {
-          const x = 14 + index * 302 / Math.max(1, dashboard.calendar.length - 1)
-          const y = score === null ? 78 : 78 - score * .7
-          return `${x},${y}`
-        }).join(' ')
-        const labels = dashboard.calendar.filter((_, index) => index % 5 === 0 || index === dashboard.calendar.length - 1)
-          .map(({ date }) => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(`${date}T12:00:00`)))
-          .map(label => `<span>${label}</span>`).join('')
-        chart.querySelector('svg').innerHTML = `<polyline points="${points}"></polyline>` + dashboard.calendar.map(({ score }, index) => {
-          const x = 14 + index * 302 / Math.max(1, dashboard.calendar.length - 1)
-          const y = score === null ? 78 : 78 - score * .7
-          return `<circle cx="${x}" cy="${y}" r="${score === null ? 2 : 4}"></circle>`
-        }).join('')
-        chart.querySelector('.chart-labels').innerHTML = labels
-      }
-    } catch (_) {
-      // The original five-day calendar stays visible if the API is unavailable.
-    }
-  }
-  new MutationObserver(render).observe(document.documentElement, { childList: true, subtree: true })
-  render()
-})()
+  const L=window.ColombiaLocales;
+  const style=document.createElement('style');
+  style.textContent=`.streak.has-calendar-history>.week{display:none}.calendar-history{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 10px;scrollbar-width:thin}.calendar-history>div{flex:0 0 60px;text-align:center}.calendar-history b{display:block;font-size:11px}.calendar-history i{display:block;font-style:normal;color:#334357}.calendar-history [data-has-activity=true] i{color:#55e980}.calendar-history .current{border-bottom:2px solid #38e0d0}`;
+  document.head.append(style);
+  let cached=null,busy=false;
+  const render=async()=>{
+    const parent=document.querySelector('.streak');if(!parent||busy)return;
+    let history=parent.querySelector('.calendar-history');
+    if(history?.dataset.historyLoaded===L.current)return;
+    busy=true;
+    try{
+      if(!cached){const response=await fetch(window.COLOMBIA_API_BASE+'/dashboard');if(!response.ok)throw new Error('Dashboard unavailable');cached=await response.json();}
+      if(!Array.isArray(cached.calendar))return;
+      if(!parent.isConnected)return;
+      if(!history){history=document.createElement('div');history.className='calendar-history';parent.append(history);}
+      history.dataset.historyLoaded=L.current;
+      history.replaceChildren(...cached.calendar.map(({date,attempts},index)=>{
+        const item=document.createElement('div');if(index===cached.calendar.length-1)item.className='current';
+        item.dataset.hasActivity=String(attempts>0);
+        const label=document.createElement('b');label.textContent=new Intl.DateTimeFormat(L.dateLocale,{day:'numeric',month:'short'}).format(new Date(date+'T12:00:00'));
+        const mark=document.createElement('i');mark.title=L.ui('sessions',{count:attempts});mark.textContent=attempts>0?'✓':'·';
+        item.append(label,mark);return item;
+      }));
+      parent.classList.add('has-calendar-history');
+    }catch{ /* Keep the original five-day view if the API is unavailable. */ }
+    finally{busy=false;}
+  };
+  window.addEventListener('colombia:locale-changed',render);
+  window.addEventListener('reviews:updated',()=>{cached=null;const history=document.querySelector('.calendar-history');if(history)delete history.dataset.historyLoaded;render();});
+  new MutationObserver(render).observe(document.documentElement,{childList:true,subtree:true});render();
+})();

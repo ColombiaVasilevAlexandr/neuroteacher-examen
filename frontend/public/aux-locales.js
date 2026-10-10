@@ -1,0 +1,97 @@
+(() => {
+  const L = window.ColombiaLocales;
+  const messages = {
+    planTitle:['Plan de estudio','План подготовки','Study plan','Lernplan','Plan de préparation','备考计划'],
+    setup:['Indica la fecha del examen para repartir {count} preguntas entre los días disponibles.','Укажите дату экзамена, чтобы распределить {count} вопросов по дням.','Set the exam date to spread {count} questions over the available days.','Legen Sie das Prüfungsdatum fest, um {count} Fragen auf die verfügbaren Tage zu verteilen.','Indiquez la date de l’examen pour répartir {count} questions sur les jours disponibles.','设置考试日期，将 {count} 道题分配到剩余天数。'],
+    today:['Plan del día','План дня','Today’s plan','Tagesplan','Plan du jour','今日计划'],
+    focus:['Modo {mode} · temas: {topics}','Режим: {mode} · темы: {topics}','{mode} mode · topics: {topics}','Modus: {mode} · Themen: {topics}','Mode : {mode} · thèmes : {topics}','模式：{mode} · 主题：{topics}'],
+    calm:['tranquilo','спокойный','relaxed','entspannt','tranquille','轻松'],
+    normal:['normal','нормальный','normal','normal','normal','普通'],
+    intensive:['intensivo','интенсивный','intensive','intensiv','intensif','强化'],
+    final:['repaso final','финальный рывок','final review','letzte Wiederholung','révision finale','最后复习'],
+    save:['Guardar','Сохранить','Save','Speichern','Enregistrer','保存'],
+    listenDay:['Escuchar el módulo del día','Слушать модуль дня','Listen to today’s module','Heutiges Modul anhören','Écouter le module du jour','收听今日模块'],
+    startLesson:['Empezar la lección','Начать урок','Start lesson','Lektion starten','Commencer la leçon','开始课程'],
+    untilExam:['Hasta el examen','До экзамена','Until the exam','Bis zur Prüfung','Avant l’examen','距考试'],
+    days:['días','дней','days','Tage','jours','天'],
+    newQuestions:['Nuevas','Новые','New','Neue','Nouvelles','新题'],
+    review:['Repasar','Повторить','Review','Wiederholen','Réviser','复习'],
+    questions:['preguntas','вопросов','questions','Fragen','questions','题'],
+    time:['Tiempo','Время','Time','Zeit','Temps','时间'],
+    minutes:['minutos','минут','minutes','Minuten','minutes','分钟'],
+    newCount:['{topic}: {count} nuevas','{topic}: {count} новых','{topic}: {count} new','{topic}: {count} neue','{topic} : {count} nouvelles','{topic}：{count} 道新题'],
+    itemCount:['{count} preguntas','{count} вопросов','{count} questions','{count} Fragen','{count} questions','{count} 题'],
+    minuteCount:['{count} min','{count} мин.','{count} min','{count} Min.','{count} min','{count} 分钟'],
+    questionCount:['Pregunta {index} de {total}','Вопрос {index} из {total}','Question {index} of {total}','Frage {index} von {total}','Question {index} sur {total}','第 {index} 题，共 {total} 题'],
+    lessonDone:['Lección terminada: {score} / {total}','Урок завершён: {score} / {total}','Lesson complete: {score} / {total}','Lektion abgeschlossen: {score} / {total}','Leçon terminée : {score} / {total}','课程完成：{score} / {total}'],
+    mistakesQueued:['Los errores se añadirán al repaso.','Ошибки попадут в повторение.','Mistakes will be added to review.','Fehler werden zur Wiederholung hinzugefügt.','Les erreurs seront ajoutées aux révisions.','错题将加入复习。'],
+    close:['Cerrar','Закрыть','Close','Schließen','Fermer','关闭'],
+    theory:['Teoría: {topic}','Теория: {topic}','Theory: {topic}','Theorie: {topic}','Théorie : {topic}','理论：{topic}'],
+    theoryDescription:['Repasar el material del módulo y escuchar su lección de audio.','Повторить материал модуля и прослушать его аудиоурок.','Review the module material and listen to its audio lesson.','Modulinhalt wiederholen und die Audiolektion anhören.','Réviser le module et écouter sa leçon audio.','复习模块内容并收听音频课程。'],
+    new:['Nuevas preguntas','Новые вопросы','New questions','Neue Fragen','Nouvelles questions','新题'],
+    newDescription:['Practicar preguntas que aún no has respondido.','Пройти вопросы, на которые вы ещё не отвечали.','Practice questions you have not answered yet.','Fragen üben, die Sie noch nicht beantwortet haben.','Répondre aux questions encore inédites.','练习尚未回答的问题。'],
+    reviewStep:['Repaso','Повторение','Review','Wiederholung','Révision','复习'],
+    reviewDescription:['Practicar preguntas pendientes de repaso espaciado.','Закрепить вопросы из очереди интервального повторения.','Practice questions due for spaced review.','Fällige Fragen aus der Wiederholungswarteschlange üben.','Réviser les questions prévues par la répétition espacée.','练习到期的间隔复习题目。'],
+    errors:['Análisis de errores','Разбор ошибок','Review mistakes','Fehleranalyse','Analyse des erreurs','分析错题'],
+    errorsDescription:['Leer las explicaciones y comprender los errores.','Прочитать объяснения и понять причины ошибок.','Read explanations and understand the mistakes.','Erklärungen lesen und Fehler verstehen.','Lire les explications et comprendre les erreurs.','阅读解释并理解错误原因。'],
+    test:['Prueba breve','Мини-тест','Short test','Kurztest','Test court','小测验'],
+    testDescription:['Responder sin pistas y guardar el resultado.','Ответить без подсказок и сохранить результат.','Answer without hints and save the result.','Ohne Hinweise antworten und das Ergebnis speichern.','Répondre sans indices et enregistrer le résultat.','不使用提示作答并保存结果。'],
+    exam:['Simulacro de examen','Симуляция экзамена','Practice exam','Übungsprüfung','Examen blanc','模拟考试'],
+    examDescription:['Practicar un bloque largo en modo examen.','Пройти длинный блок в режиме экзамена.','Practice a longer block in exam mode.','Einen längeren Fragenblock im Prüfungsmodus üben.','Passer une série longue en mode examen.','在考试模式中练习一组较长的题目。'],
+    saveError:['No se pudo guardar. Inténtalo de nuevo.','Не удалось сохранить. Повторите попытку.','Could not save. Try again.','Speichern fehlgeschlagen. Versuchen Sie es erneut.','Enregistrement impossible. Réessayez.','保存失败，请重试。'],
+    answerError:['No se pudo guardar la respuesta. Inténtalo de nuevo.','Не удалось сохранить ответ. Повторите попытку.','Could not save the answer. Try again.','Antwort konnte nicht gespeichert werden. Versuchen Sie es erneut.','Réponse non enregistrée. Réessayez.','答案未保存，请重试。'],
+    reviewHeading:['Repaso espaciado','Интервальное повторение','Spaced review','Verteilte Wiederholung','Révision espacée','间隔复习'],
+    reviewIntro:['Repasa preguntas que ya toca repetir.','Повторяйте вопросы, срок которых уже подошёл.','Practice questions that are due for review.','Wiederholen Sie die fälligen Fragen.','Révisez les questions arrivées à échéance.','复习已到期的问题。'],
+    reviewDone:['Repaso terminado','Повторение завершено','Review complete','Wiederholung abgeschlossen','Révision terminée','复习完成'],
+    reviewNextDate:['La siguiente tanda aparecerá en la fecha prevista.','Следующая очередь появится в назначенный день.','The next set will appear on its scheduled date.','Die nächsten Fragen erscheinen am geplanten Tag.','La prochaine série apparaîtra à la date prévue.','下一组题目将在预定日期出现。'],
+    reviewCount:['REPASO {index} DE {total}','ПОВТОРЕНИЕ {index} ИЗ {total}','REVIEW {index} OF {total}','WIEDERHOLUNG {index} VON {total}','RÉVISION {index} SUR {total}','复习：第 {index} 题，共 {total} 题'],
+    reviewLoading:['Cargando preguntas de repaso…','Загружаю очередь повторения…','Loading review questions…','Wiederholungsfragen werden geladen…','Chargement des questions de révision…','正在加载复习题目…'],
+    reviewEmpty:['No hay repasos pendientes hoy','Сегодня повторений нет','No reviews due today','Heute sind keine Fragen fällig','Aucune révision prévue aujourd’hui','今天没有到期复习'],
+    reviewEmptyDescription:['Los errores y las preguntas marcadas aparecerán aquí en la fecha prevista.','Ошибки и отмеченные вопросы появятся здесь в назначенный день.','Mistakes and bookmarked questions will appear here on their scheduled date.','Fehler und markierte Fragen erscheinen hier am geplanten Tag.','Les erreurs et les favoris apparaîtront ici à la date prévue.','错题和收藏题目将在预定日期出现。'],
+    reviewError:['No se pudo cargar el repaso.','Не удалось загрузить очередь повторения.','Could not load review questions.','Wiederholungsfragen konnten nicht geladen werden.','Impossible de charger les révisions.','无法加载复习题目。'],
+    sessions:['{count} respuestas','{count} ответов','{count} answers','{count} Antworten','{count} réponses','{count} 次作答'],
+    audioTitle:['Biblioteca de audio','Аудиобиблиотека','Audio library','Audiobibliothek','Bibliothèque audio','音频库'],
+    audioIntro:['Escucha la guía completa o un módulo. La posición se guarda en este navegador.','Слушайте всю методичку или отдельный модуль. Позиция сохраняется в этом браузере.','Listen to the whole guide or a module. Your position is saved in this browser.','Hören Sie den ganzen Leitfaden oder ein Modul. Die Position wird in diesem Browser gespeichert.','Écoutez le guide entier ou un module. La position est enregistrée dans ce navigateur.','收听完整指南或单个模块。播放位置保存在此浏览器中。'],
+    audioContinue:['Seguir escuchando','Слушать дальше','Continue listening','Weiterhören','Continuer l’écoute','继续收听'],
+    audioPause:['Pausar','Пауза','Pause','Pause','Pause','暂停'],
+    audioStop:['Detener','Стоп','Stop','Stopp','Arrêter','停止'],
+    audioAll:['Escuchar toda la guía','Слушать всю методичку','Listen to the whole guide','Ganzen Leitfaden anhören','Écouter tout le guide','收听完整指南'],
+    audioOther:['Otros módulos','Другие модули','Other modules','Weitere Module','Autres modules','其他模块'],
+    audioSaved:['Guardado: {time}','Сохранено: {time}','Saved: {time}','Gespeichert: {time}','Enregistré : {time}','已保存：{time}'],
+    audioFromStart:['Desde el principio','С начала','From the start','Von Anfang an','Depuis le début','从头开始'],
+    audioStart:['Empezar','Начать','Start','Starten','Commencer','开始'],
+    audioListenFrom:['Escuchar desde {time}','Слушать с {time}','Listen from {time}','Ab {time} anhören','Écouter à partir de {time}','从 {time} 开始收听'],
+    audioReady:['Listo para reproducir','Готово к воспроизведению','Ready to play','Bereit zur Wiedergabe','Prêt à écouter','可以播放'],
+    audioLoading:['Cargando audio','Загрузка аудио','Loading audio','Audio wird geladen','Chargement audio','正在加载音频'],
+    audioPlaying:['Reproduciendo','Воспроизведение','Playing','Wiedergabe','Lecture en cours','正在播放'],
+    audioBlocked:['No se pudo iniciar el audio; pulsa Play en el reproductor.','Не удалось запустить аудио; нажмите Play в плеере.','Could not start audio; press Play in the player.','Audio konnte nicht gestartet werden; drücken Sie Play im Player.','Lecture impossible ; appuyez sur Play dans le lecteur.','无法启动音频，请点击播放器中的播放按钮。'],
+    geographyTitle:['Geografía de Colombia','География Колумбии','Geography of Colombia','Geografie Kolumbiens','Géographie de la Colombie','哥伦比亚地理'],
+    historyTitle:['Historia de Colombia','История Колумбии','History of Colombia','Geschichte Kolumbiens','Histoire de la Colombie','哥伦比亚历史'],
+    constitutionTitle:['Constitución y Estado','Конституция и государство','Constitution and government','Verfassung und Staat','Constitution et État','宪法与国家'],
+    spanishTitle:['Lengua española','Испанский язык','Spanish language','Spanische Sprache','Langue espagnole','西班牙语'],
+    cultureTitle:['Cultura de Colombia','Культура Колумбии','Culture of Colombia','Kultur Kolumbiens','Culture de la Colombie','哥伦比亚文化'],
+    naturalizationTitle:['Naturalización','Натурализация','Naturalization','Einbürgerung','Naturalisation','入籍'],
+    back:['Volver','Назад','Back','Zurück','Retour','返回'],
+    progressTitle:['Tu progreso','Ваш прогресс','Your progress','Ihr Fortschritt','Votre progression','学习进度'],
+    progressIntro:['Aquí aparecerán resultados, temas y evolución.','Здесь появится история результатов, темы и динамика подготовки.','Your results, topics and progress appear here.','Hier erscheinen Ergebnisse, Themen und Lernfortschritt.','Vos résultats, thèmes et progrès apparaîtront ici.','这里显示成绩、主题和学习进度。'],
+    correctHistoryIntro:['Aquí se cuentan todas las respuestas correctas de prácticas y exámenes.','Здесь учитываются все правильные ответы из тренировок и экзаменов.','This includes all correct answers from practice and exams.','Hier zählen alle richtigen Antworten aus Übungen und Prüfungen.','Toutes les bonnes réponses des entraînements et examens sont comptabilisées ici.','这里统计练习和考试中的所有正确答案。'],
+    averageTitle:['Tiempo medio de respuesta','Среднее время ответа','Average answer time','Durchschnittliche Antwortzeit','Temps moyen de réponse','平均答题用时'],
+    averageIntro:['Se calcula desde que aparece la pregunta hasta comprobar la respuesta.','Показатель рассчитывается по времени от появления вопроса до проверки ответа.','Measured from the question appearing to checking the answer.','Gemessen vom Anzeigen der Frage bis zur Antwortprüfung.','Calculé entre l’affichage de la question et la vérification de la réponse.','从显示问题到检查答案之间的用时。'],
+    pdfRussian:['PDF en ruso','Русский PDF','Russian PDF','Russische PDF','PDF russe','俄语 PDF'],
+    pdfSpanish:['PDF en español','Испанский PDF','Spanish PDF','Spanische PDF','PDF espagnol','西班牙语 PDF'],
+    pdfLanguages:['Documentos disponibles en español y ruso.','Документы доступны на испанском и русском.','Documents are available in Spanish and Russian.','Dokumente sind auf Spanisch und Russisch verfügbar.','Documents disponibles en espagnol et en russe.','文档提供西班牙语和俄语版本。'],
+    noResponses:['Aún no hay respuestas.','Подходящих ответов пока нет.','No answers yet.','Noch keine Antworten.','Aucune réponse pour le moment.','暂无作答记录。']
+  };
+  Object.entries(messages).forEach(([key,row])=>{
+    const slots=value=>Array.from(value.matchAll(/\{(\w+)\}/g),match=>match[1]).sort().join(',');
+    if(row.some(value=>slots(value)!==slots(row[0])))throw new Error('Inconsistent UI placeholders: '+key);
+  });
+  L.register(Object.values(messages));
+  L.ui = (key, values={}) => {
+    const row=messages[key];
+    if (!row) throw new Error('Unknown UI message: '+key);
+    return row[L.ids.indexOf(L.current)].replace(/\{(\w+)\}/g,(_,name)=>String(values[name]??''));
+  };
+  Object.defineProperty(L,'dateLocale',{get:()=>({'es':'es-CO','ru':'ru-RU','en':'en-GB','de':'de-DE','fr':'fr-FR','zh-Hans':'zh-CN'}[L.current])});
+  L.messageKeys = Object.keys(messages);
+})();

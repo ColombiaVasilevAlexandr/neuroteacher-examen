@@ -4,10 +4,12 @@ const root=path.join(__dirname,'../frontend/public');
 const storage=new Map(),calls=[];
 const localStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value))};
 const document={documentElement:{lang:''}};
-const window={location:{href:'http://192.168.1.20:5173/'},COLOMBIA_API_BASE:'http://192.168.1.20:8000/api',
+const events=[];class CustomEvent{constructor(type,options){this.type=type;this.detail=options.detail;}};
+const window={dispatchEvent:event=>events.push(event),location:{href:'http://192.168.1.20:5173/'},COLOMBIA_API_BASE:'http://192.168.1.20:8000/api',
   fetch:async(input,init)=>{calls.push({input,init});return {ok:true};}};
-const ctx=vm.createContext({window,document,localStorage,Request,URL,Math,Date,Intl,Error,encodeURIComponent});
+const ctx=vm.createContext({window,document,localStorage,CustomEvent,Request,URL,Math,Date,Intl,Error,encodeURIComponent});
 vm.runInContext(fs.readFileSync(path.join(root,'locales.js'),'utf8'),ctx);
+vm.runInContext(fs.readFileSync(path.join(root,'aux-locales.js'),'utf8'),ctx);
 const locales=window.ColombiaLocales;
 assert.deepEqual(Array.from(locales.ids),['es','ru','en','de','fr','zh-Hans']);
 const jsx=(type,props)=>({type,props});
@@ -25,7 +27,9 @@ function nodes(tree){if(!tree||typeof tree!=='object')return [];
 function text(tree){return Array.isArray(tree)?tree.map(text).join(''):tree&&typeof tree==='object'?text(tree.props?.children):tree==null?'':String(tree);}
 const expected=['Hoy','Сегодня','Today','Heute',"Aujourd’hui",'今天'];
 for(let index=0;index<locales.ids.length;index++){
- const locale=locales.ids[index];locales.set(locale);states=[];hook=0;
+ const locale=locales.ids[index];locales.set(locale);const eventCount=events.length;locales.set(locale);assert.equal(events.length,eventCount);states=[];hook=0;
+ for(const key of locales.messageKeys){const value=locales.ui(key,{count:12,index:1,total:30,score:5,mode:'TEST',topics:'TEST',topic:'TEST',time:'1:23'});assert(value.length>0);assert(!/\{\w+\}/.test(value));}
+ assert.equal(locales.dateLocale,['es-CO','ru-RU','en-GB','de-DE','fr-FR','zh-CN'][index]);
  const tree=ctx.ne();const select=nodes(tree).find(n=>n.type==='select'&&n.props.className==='language');
  assert(select);assert.equal(select.props.value,locale);assert.equal(select.props.children.length,6);
  const first=nodes(tree).find(n=>n.type==='button'&&n.props['data-nav']==='Hoy');

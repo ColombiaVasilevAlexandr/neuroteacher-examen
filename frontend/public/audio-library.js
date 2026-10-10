@@ -1,21 +1,6 @@
 (() => {
-  const text = {
-    title: '\u0410\u0443\u0434\u0438\u043e\u0442\u0435\u043a\u0430 \u043c\u0435\u0442\u043e\u0434\u0438\u0447\u043a\u0438',
-    intro: '\u0421\u043b\u0443\u0448\u0430\u0439\u0442\u0435 \u0432\u0441\u044e \u043c\u0435\u0442\u043e\u0434\u0438\u0447\u043a\u0443 \u043f\u043e\u0434\u0440\u044f\u0434 \u0438\u043b\u0438 \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u044b\u0435 \u043c\u043e\u0434\u0443\u043b\u0438. \u041f\u043e\u0437\u0438\u0446\u0438\u044f \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u0442\u0441\u044f \u0432 \u044d\u0442\u043e\u043c \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435.',
-    continue: '\u0421\u043b\u0443\u0448\u0430\u0442\u044c \u0434\u0430\u043b\u044c\u0448\u0435',
-    pause: '\u041f\u0430\u0443\u0437\u0430',
-    stop: '\u0421\u0442\u043e\u043f',
-    playAll: '\u0421\u043b\u0443\u0448\u0430\u0442\u044c \u0432\u0441\u044e \u043c\u0435\u0442\u043e\u0434\u0438\u0447\u043a\u0443',
-    otherModules: '\u0414\u0440\u0443\u0433\u0438\u0435 \u043c\u043e\u0434\u0443\u043b\u0438',
-    saved: '\u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e',
-    fromStart: '\u0441 \u043d\u0430\u0447\u0430\u043b\u0430',
-    start: '\u043d\u0430\u0447\u0430\u0442\u044c',
-    listenFrom: '\u0441\u043b\u0443\u0448\u0430\u0442\u044c \u0441',
-    ready: '\u0433\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u044e',
-    loading: '\u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0430\u0443\u0434\u0438\u043e',
-    playing: '\u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u0435',
-    blocked: '\u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043b \u0430\u0432\u0442\u043e\u0437\u0430\u043f\u0443\u0441\u043a: \u043d\u0430\u0436\u043c\u0438\u0442\u0435 Play \u0432 \u043f\u043b\u0435\u0435\u0440\u0435',
-  }
+  const L=window.ColombiaLocales, ui=(key,values)=>L.escape(L.ui(key,values))
+  const text = new Proxy({}, {get:(_,key)=>L.ui({title:'audioTitle',intro:'audioIntro',continue:'audioContinue',pause:'audioPause',stop:'audioStop',playAll:'audioAll',otherModules:'audioOther',fromStart:'audioFromStart',start:'audioStart',ready:'audioReady',loading:'audioLoading',playing:'audioPlaying',blocked:'audioBlocked'}[key])})
 
   const lessons = [
     { id: 'geography', number: '01', title: '\u0413\u0435\u043e\u0433\u0440\u0430\u0444\u0438\u044f \u041a\u043e\u043b\u0443\u043c\u0431\u0438\u0438', topic: '\u0413\u0435\u043e\u0433\u0440\u0430\u0444\u0438\u044f', file: 'lesson-01-geography-full.mp3' },
@@ -109,8 +94,8 @@
       .map((lesson, index) => {
         if (index === currentIndex) return ''
         const position = state.positions?.[lesson.id] || 0
-        const label = position ? `${text.listenFrom} ${formatTime(position)}` : text.start
-        return `<button class="audio-lesson" data-index="${index}"><b>${lesson.number}. ${lesson.title}</b><span>${lesson.topic}</span><mark>${label}</mark></button>`
+        const label = position ? ui('audioListenFrom',{time:formatTime(position)}) : text.start
+        return `<button class="audio-lesson" data-index="${index}"><b>${lesson.number}. ${ui(lesson.id+'Title')}</b><span>${L.escape(L.text(lesson.topic))}</span><mark>${label}</mark></button>`
       })
       .join('')
 
@@ -128,13 +113,13 @@
         </div>
       </div>
       <div class="audio-player">
-        <strong>${current.number}. ${current.title}</strong>
+        <strong>${current.number}. ${ui(current.id+'Title')}</strong>
         <div class="audio-current-meta">
-          <span>${current.topic}</span>
-          <span>${currentPosition ? `${text.saved} ${formatTime(currentPosition)}` : text.fromStart}</span>
+          <span>${L.escape(L.text(current.topic))}</span>
+          <span>${currentPosition ? ui('audioSaved',{time:formatTime(currentPosition)}) : text.fromStart}</span>
         </div>
         <audio controls preload="metadata" src="/audio/${current.file}" data-current-id="${current.id}"></audio>
-        <div class="audio-status">${text.ready}</div>
+        <div class="audio-status" data-ui-status="ready">${text.ready}</div>
         <div class="audio-progress-line"><i></i></div>
       </div>
       <div class="audio-lessons-title">${text.otherModules}</div>
@@ -145,18 +130,19 @@
     const bar = card.querySelector('.audio-progress-line i')
     const status = card.querySelector('.audio-status')
 
-    function setStatus(message, warning = false) {
-      status.textContent = message
+    function setStatus(key, warning = false) {
+      status.dataset.uiStatus=key
+      status.textContent = text[key]
       status.classList.toggle('warn', warning)
     }
 
     async function playCurrent() {
-      setStatus(text.loading)
+      setStatus('loading')
       try {
         await audio.play()
-        setStatus(text.playing)
+        setStatus('playing')
       } catch {
-        setStatus(text.blocked, true)
+        setStatus('blocked', true)
       }
     }
 
@@ -170,7 +156,7 @@
 
     audio.addEventListener('loadedmetadata', () => {
       if (currentPosition > 0 && currentPosition < audio.duration - 3) audio.currentTime = currentPosition
-      setStatus(text.ready)
+      setStatus('ready')
     })
     audio.addEventListener('timeupdate', () => {
       if (audio.duration) bar.style.width = `${Math.min(100, (audio.currentTime / audio.duration) * 100)}%`
@@ -229,6 +215,16 @@
       }
     })
   }
+
+  window.addEventListener('colombia:locale-changed', () => {
+    const card=document.querySelector('.audio-library'); if(!card)return
+    const state=loadState(), current=lessons[currentIndex], position=state.positions?.[current.id]||0
+    const labels={'.audio-library-head h2':text.title,'.audio-library-head p':text.intro,'.continue':text.continue,'.pause':text.pause,'.stop':text.stop,'.all':text.playAll,'.audio-lessons-title':text.otherModules,'.audio-player strong':current.number+'. '+L.ui(current.id+'Title')}
+    Object.entries(labels).forEach(([selector,value])=>{card.querySelector(selector).textContent=value})
+    const meta=card.querySelectorAll('.audio-current-meta span');meta[0].textContent=L.text(current.topic);meta[1].textContent=position?L.ui('audioSaved',{time:formatTime(position)}):text.fromStart
+    const status=card.querySelector('.audio-status');status.textContent=text[status.dataset.uiStatus||'ready']
+    card.querySelectorAll('[data-index]').forEach(button=>{const lesson=lessons[Number(button.dataset.index)],pos=state.positions?.[lesson.id]||0;button.querySelector('b').textContent=lesson.number+'. '+L.ui(lesson.id+'Title');button.querySelector('span').textContent=L.text(lesson.topic);button.querySelector('mark').textContent=pos?L.ui('audioListenFrom',{time:formatTime(pos)}):text.start})
+  })
 
   const observer = new MutationObserver(() => {
     if (document.querySelector('.content') && !document.querySelector('.audio-library')) render()

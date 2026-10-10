@@ -100,9 +100,11 @@
     return value.replace(value.trim(),row[index < 0 ? 0 : index]);
   }
   function set(locale) {
+    const previous=current;
     current=ids.includes(locale)?locale:'es';
     localStorage.setItem('neuroteacher-language',current);
     document.documentElement.lang=current;
+    if(previous!==current)window.dispatchEvent(new CustomEvent('colombia:locale-changed',{detail:{locale:current}}));
   }
   function children(value) {
     return Array.isArray(value)?value.map(children):text(value);
@@ -112,7 +114,7 @@
       ? {...p,children:children(p.children),title:text(p.title),'aria-label':text(p['aria-label'])}:p;
     return {...jsx,jsx:(type,p,key)=>jsx.jsx(type,props(p),key),jsxs:(type,p,key)=>jsx.jsxs(type,props(p),key)};
   }
-  window.ColombiaLocales={ids,labels,text,set,wrap,escape:value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),get current(){return current;},fallback:()=>text('Traducción no disponible; se muestra el original en español.')};
+  window.ColombiaLocales={ids,labels,text,set,wrap,register:extra=>extra.forEach(row=>{if(row.length!==ids.length||row.some(value=>typeof value!=='string'))throw new Error('Invalid locale row');row.forEach(value=>{if(!catalog.has(value))catalog.set(value,row);});}),escape:value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),get current(){return current;},fallback:()=>text('Traducción no disponible; se muestra el original en español.')};
   set(current);
   const fetchOriginal=window.fetch.bind(window);
   window.fetch=(input,init)=>{
