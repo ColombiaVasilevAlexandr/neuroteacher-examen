@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
+import asyncio
 import os
 import json
 import re
@@ -23,6 +24,8 @@ ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 load_dotenv(Path(__file__).resolve().parent / ".env")
 DB_PATH = ROOT / "database" / "colombia_exam.db"
+RUSSIAN_TTS_VOICE = os.getenv("RUSSIAN_TTS_VOICE", "ru-RU-DmitryNeural")
+SPANISH_TTS_VOICE = os.getenv("SPANISH_TTS_VOICE", "es-CO-SalomeNeural")
 SOURCE_URL = "https://www.cancilleria.gov.co/sites/default/files/FOTOS2025/Gu%C3%ADa%20de%20estudio_ajustada.pdf"
 
 # Training seed: these questions require editorial verification against the PDF before an exam mode may use them.
@@ -210,23 +213,38 @@ def sanitize_ai_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 def local_ai_reply(message: str, reason: str = "provider_unavailable") -> str:
+    normalized = message.casefold()
     asks_in_russian = bool(re.search(r"[\u0400-\u04FF]", message))
-    spanish = (
-        "Estoy en modo local porque el proveedor de IA no responde ahora. "
-        "Puedo ayudarte con pr\u00e1ctica b\u00e1sica: responde en espa\u00f1ol con una frase corta y luego revisamos. "
-        "Pregunta: \u00bfCu\u00e1l es la capital de Colombia?"
+    offline_note = (
+        "Modo local: el proveedor externo de IA no responde ahora."
+        if reason != "http_402"
+        else "Modo local: DeepSeek rechazó la solicitud por saldo o cuota insuficiente."
     )
-    russian = (
-        "\u0421\u0435\u0439\u0447\u0430\u0441 \u0432\u043a\u043b\u044e\u0447\u0435\u043d \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u044b\u0439 \u0440\u0435\u0436\u0438\u043c: "
-        "\u0432\u043d\u0435\u0448\u043d\u0438\u0439 AI-\u043f\u0440\u043e\u0432\u0430\u0439\u0434\u0435\u0440 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d. "
-        "\u042f \u043c\u043e\u0433\u0443 \u0434\u0430\u0442\u044c \u0431\u0430\u0437\u043e\u0432\u0443\u044e \u0442\u0440\u0435\u043d\u0438\u0440\u043e\u0432\u043a\u0443 \u0431\u0435\u0437 \u0441\u0435\u0442\u0438: "
-        "\u043e\u0442\u0432\u0435\u0442\u044c\u0442\u0435 \u043f\u043e-\u0438\u0441\u043f\u0430\u043d\u0441\u043a\u0438 \u043a\u043e\u0440\u043e\u0442\u043a\u043e\u0439 \u0444\u0440\u0430\u0437\u043e\u0439, "
-        "\u0437\u0430\u0442\u0435\u043c \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u043c. "
-        "\u0412\u043e\u043f\u0440\u043e\u0441: \u043a\u0430\u043a\u0430\u044f \u0441\u0442\u043e\u043b\u0438\u0446\u0430 \u041a\u043e\u043b\u0443\u043c\u0431\u0438\u0438?"
+    offline_note_ru = (
+        "Локальный режим: внешний AI-провайдер сейчас не отвечает."
+        if reason != "http_402"
+        else "Локальный режим: DeepSeek отклонил запрос из-за баланса или квоты."
     )
+
+    if re.search(r"\bbogot[aá]\b", normalized):
+        spanish = "Correcto: la capital de Colombia es Bogotá. Frase mejor: La capital de Colombia es Bogotá. Siguiente pregunta: ¿Qué colores tiene la bandera de Colombia?"
+        russian = "Верно: столица Колумбии — Богота. Лучше сказать полной фразой: La capital de Colombia es Bogotá. Следующий вопрос: какие цвета у флага Колумбии?"
+    elif "habl" in normalized and "conmigo" in normalized:
+        spanish = "Claro. Practiquemos una conversación corta. Responde en español: Buenos días, me llamo Aleksandr y vivo en Colombia. ¿Cómo responderías si te preguntan de dónde eres?"
+        russian = "Давайте потренируем короткий диалог. Ответьте по-испански: что бы вы сказали, если вас спросят, откуда вы?"
+    elif "ошиб" in normalized or "error" in normalized:
+        spanish = "Tu frase se entiende, pero faltó el artículo. Mejor: La capital de Colombia es Bogotá. En español, capital normalmente lleva artículo en esta frase."
+        russian = "Фраза понятна, но не хватает артикля. Лучше: La capital de Colombia es Bogotá. В такой фразе по-испански обычно нужен артикль La."
+    elif "диалог" in normalized or "dialog" in normalized:
+        spanish = "A: Buenos días. ¿De dónde es usted? B: Soy de Rusia y vivo en Colombia. Ahora responde tú: ¿Por qué quieres obtener la nacionalidad colombiana?"
+        russian = "Диалог: A спрашивает, откуда вы. B отвечает: я из России и живу в Колумбии. Теперь ответьте: почему вы хотите получить гражданство Колумбии?"
+    else:
+        spanish = "Puedo hacer práctica básica sin conexión. Pregunta: ¿Cuál es la capital de Colombia? Responde con una frase completa."
+        russian = "Я могу вести базовую тренировку без внешнего AI. Вопрос: какая столица Колумбии? Ответьте полной фразой."
+
     if asks_in_russian:
-        return f"{russian}\n\nES: {spanish}"
-    return f"{spanish}\n\nRU: {russian}"
+        return f"{offline_note_ru}\n\n{russian}\n\nES: {spanish}"
+    return f"{offline_note}\n\n{spanish}\n\nRU: {russian}"
 
 class SpeechRequest(BaseModel):
     text: str
@@ -282,18 +300,22 @@ async def consultant_speech(payload: SpeechRequest):
     text = sanitize_ai_text(payload.text)
     if not text:
         raise HTTPException(400, "Text is required")
-    voice = "ru-RU-DmitryNeural" if re.search(r"[А-Яа-яЁё]", text) else "es-CO-GonzaloNeural"
-    if payload.locale == "es-CO":
-        voice = "es-CO-GonzaloNeural"
-    elif payload.locale == "ru-RU":
-        voice = "ru-RU-DmitryNeural"
-    try:
+    locale = (payload.locale or ("ru-RU" if re.search(r"[А-Яа-яЁё]", text) else "es-CO")).split("-")[0].lower()
+    voices = {"ru": RUSSIAN_TTS_VOICE, "es": SPANISH_TTS_VOICE,
+              "en": "en-US-JennyNeural", "de": "de-DE-KatjaNeural",
+              "fr": "fr-FR-DeniseNeural", "zh": "zh-CN-XiaoxiaoNeural"}
+    voice = voices.get(locale, SPANISH_TTS_VOICE)
+    async def synthesize():
         audio = bytearray()
         communicate = edge_tts.Communicate(text, voice=voice, rate=payload.rate)
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 audio.extend(chunk["data"])
+        if not audio:
+            raise RuntimeError("Empty speech")
         return Response(content=bytes(audio), media_type="audio/mpeg")
+    try:
+        return await asyncio.wait_for(synthesize(), timeout=25)
     except Exception:
         raise HTTPException(502, "Speech service is unavailable")
 

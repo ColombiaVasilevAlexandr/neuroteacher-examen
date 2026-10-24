@@ -75,7 +75,10 @@
     return true
   }
 
-  function render() {
+  function render(autoplay = false) {
+    const continuous = playAll
+    if (audio) audio.pause()
+    playAll = continuous
     const target = document.querySelector('.content') || document.querySelector('.app-shell') || document.body
     let card = document.querySelector('.audio-library')
     if (!card) {
@@ -126,7 +129,8 @@
       <div class="audio-lessons">${lessonButtons}</div>
     `
 
-    audio = card.querySelector('audio')
+    const player = card.querySelector('audio')
+    audio = player
     const bar = card.querySelector('.audio-progress-line i')
     const status = card.querySelector('.audio-status')
 
@@ -139,7 +143,7 @@
     async function playCurrent() {
       setStatus('loading')
       try {
-        await audio.play()
+        await player.play()
         setStatus('playing')
       } catch {
         setStatus('blocked', true)
@@ -148,33 +152,33 @@
 
     function persist() {
       const next = loadState()
-      next.currentIndex = currentIndex
       next.positions = next.positions || {}
-      if (audio.currentTime > 0) next.positions[current.id] = Math.floor(audio.currentTime)
+      if (player.currentTime > 0) next.positions[current.id] = Math.floor(player.currentTime)
       saveState(next)
     }
 
-    audio.addEventListener('loadedmetadata', () => {
-      if (currentPosition > 0 && currentPosition < audio.duration - 3) audio.currentTime = currentPosition
+    player.addEventListener('loadedmetadata', () => {
+      if (currentPosition > 0 && currentPosition < player.duration - 3) player.currentTime = currentPosition
       setStatus('ready')
     })
-    audio.addEventListener('timeupdate', () => {
-      if (audio.duration) bar.style.width = `${Math.min(100, (audio.currentTime / audio.duration) * 100)}%`
-      if (Math.floor(audio.currentTime) % 5 === 0) persist()
+    player.addEventListener('timeupdate', () => {
+      if (player.duration) bar.style.width = `${Math.min(100, (player.currentTime / player.duration) * 100)}%`
+      if (Math.floor(player.currentTime) % 5 === 0) persist()
     })
-    audio.addEventListener('pause', () => {
-      playAll = false
+    player.addEventListener('pause', () => {
+      if (!player.ended) playAll = false
       persist()
     })
-    audio.addEventListener('ended', () => {
+    player.addEventListener('ended', () => {
       const next = loadState()
       next.positions = next.positions || {}
       next.positions[current.id] = 0
       saveState(next)
       if (playAll && currentIndex < lessons.length - 1) {
         currentIndex += 1
-        render()
-        document.querySelector('.audio-library .continue')?.click()
+        next.currentIndex = currentIndex
+        saveState(next)
+        render(true)
       }
     })
 
@@ -184,13 +188,13 @@
     }
     card.querySelector('.pause').onclick = () => {
       playAll = false
-      audio.pause()
+      player.pause()
       persist()
     }
     card.querySelector('.stop').onclick = () => {
       playAll = false
-      audio.pause()
-      audio.currentTime = 0
+      player.pause()
+      player.currentTime = 0
       const next = loadState()
       next.currentIndex = currentIndex
       next.positions = next.positions || {}
@@ -214,6 +218,7 @@
         nextCard?.querySelector('.continue')?.click()
       }
     })
+    if (autoplay) playCurrent()
   }
 
   window.addEventListener('colombia:locale-changed', () => {
@@ -226,10 +231,12 @@
     card.querySelectorAll('[data-index]').forEach(button=>{const lesson=lessons[Number(button.dataset.index)],pos=state.positions?.[lesson.id]||0;button.querySelector('b').textContent=lesson.number+'. '+L.ui(lesson.id+'Title');button.querySelector('span').textContent=L.text(lesson.topic);button.querySelector('mark').textContent=pos?L.ui('audioListenFrom',{time:formatTime(pos)}):text.start})
   })
 
+  window.addEventListener('pagehide', () => audio?.pause())
+
   const observer = new MutationObserver(() => {
     if (document.querySelector('.content') && !document.querySelector('.audio-library')) render()
   })
   observer.observe(document.documentElement, { childList: true, subtree: true })
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render)
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => render())
   else render()
 })()

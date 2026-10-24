@@ -50,11 +50,11 @@
     return response.json()
   }
 
-  async function answer(questionId, key) {
+  async function answer(questionId, key, responseTimeSeconds) {
     return json(`/questions/${questionId}/answer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answer: key }),
+      body: JSON.stringify({ answer: key, response_time_seconds: responseTimeSeconds }),
     })
   }
 
@@ -65,11 +65,13 @@
     const modal = document.createElement('section')
     modal.className = 'study-session'
     document.body.append(modal)
+    let questionStartedAt = Date.now()
 
     const draw = () => {
       const question = data.questions[index]
       if (!question) {
-        modal.innerHTML = `<article><h2>${t('lessonDone',{score,total:data.questions.length})}</h2><p class="study-plan-muted">${t('mistakesQueued')}</p><button class="close">${t('close')}</button></article>`
+        questionStartedAt = Date.now()
+      modal.innerHTML = `<article><h2>${t('lessonDone',{score,total:data.questions.length})}</h2><p class="study-plan-muted">${t('mistakesQueued')}</p><button class="close">${t('close')}</button></article>`
         modal.querySelector('.close').onclick = () => modal.remove()
         return
       }
@@ -79,7 +81,7 @@
         button.onclick = async () => {
           modal.querySelectorAll('[data-answer]').forEach((item) => { item.disabled = true })
           try {
-            const result = await answer(question.id, button.dataset.answer)
+            const result = await answer(question.id, button.dataset.answer, Math.max(0, (Date.now() - questionStartedAt) / 1000))
             score += result.correct ? 1 : 0
             button.className = result.correct ? 'correct' : 'wrong'
             window.setTimeout(() => { index += 1; draw() }, 750)

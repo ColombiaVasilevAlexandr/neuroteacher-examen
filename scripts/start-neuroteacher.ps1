@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$NoBrowser,
     [switch]$Lan
 )
@@ -9,19 +9,22 @@ $backend = Join-Path $projectRoot 'backend'
 $frontend = Join-Path $projectRoot 'frontend'
 $staticFrontend = Join-Path $frontend 'public'
 $venvPython = Join-Path $backend '.venv\Scripts\python.exe'
-$systemPython = 'C:\Python314\python.exe'
-$python = if (Test-Path $systemPython) { $systemPython } else { $venvPython }
+$candidates = @($venvPython, (Join-Path $env:ProgramFiles 'Python312\python.exe'), 'C:\Python314\python.exe')
+$python = $null
+foreach ($candidate in $candidates) {
+    if (-not (Test-Path $candidate)) { continue }
+    & $candidate -c "import fastapi, uvicorn, dotenv, edge_tts" 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $python = $candidate; break }
+}
+if (-not $python) { throw 'Python dependencies are missing. Install backend/requirements.txt into backend/.venv.' }
 $projectRootLower = $projectRoot.ToLowerInvariant()
-$logDir = Join-Path $env:TEMP 'neuroteacher-examen'
+$logDir = Join-Path $env:TEMP ('colombia-exam-' + (Split-Path $projectRoot -Leaf))
 $backendOut = Join-Path $logDir 'backend.out.log'
 $backendErr = Join-Path $logDir 'backend.err.log'
 $frontendOut = Join-Path $logDir 'frontend.out.log'
 $frontendErr = Join-Path $logDir 'frontend.err.log'
 $bindHost = if ($Lan) { '0.0.0.0' } else { '127.0.0.1' }
 
-if (-not (Test-Path $python)) {
-    throw "Python runtime was not found. Checked: $systemPython and $venvPython"
-}
 if (-not (Test-Path (Join-Path $staticFrontend 'index.html'))) {
     throw "Static frontend index was not found: $(Join-Path $staticFrontend 'index.html')"
 }
@@ -71,8 +74,8 @@ function Stop-OwnedListener([int]$Port, [string]$ServiceName) {
     $commandLine = if ($processInfo) { [string]$processInfo.CommandLine } else { '' }
     $lowerCommandLine = $commandLine.ToLowerInvariant()
     $looksLikeBackend = $ServiceName -eq 'backend' -and $lowerCommandLine.Contains('uvicorn') -and $lowerCommandLine.Contains('main:app')
-    $looksLikeFrontend = $ServiceName -eq 'frontend' -and $lowerCommandLine.Contains('http.server') -and $lowerCommandLine.Contains('5173')
-    $workingProcessIsOurs = $commandLine -and ($lowerCommandLine.Contains($projectRootLower) -or $looksLikeBackend -or $looksLikeFrontend)
+    $looksLikeFrontend = $ServiceName -eq 'frontend' -and $lowerCommandLine.Contains('serve_frontend.py') -and $lowerCommandLine.Contains($projectRootLower)
+    $workingProcessIsOurs = $commandLine -and $lowerCommandLine.Contains($projectRootLower)
 
     if ($workingProcessIsOurs) {
         Write-Host "Restarting stale $ServiceName process on port $Port (PID $processId)..."
@@ -96,8 +99,8 @@ function Stop-ProjectListener([int]$Port, [string]$ServiceName) {
     $commandLine = if ($processInfo) { [string]$processInfo.CommandLine } else { '' }
     $lowerCommandLine = $commandLine.ToLowerInvariant()
     $looksLikeBackend = $ServiceName -eq 'backend' -and $lowerCommandLine.Contains('uvicorn') -and $lowerCommandLine.Contains('main:app')
-    $looksLikeFrontend = $ServiceName -eq 'frontend' -and $lowerCommandLine.Contains('http.server') -and $lowerCommandLine.Contains('5173')
-    if ($commandLine -and ($lowerCommandLine.Contains($projectRootLower) -or $looksLikeBackend -or $looksLikeFrontend)) {
+    $looksLikeFrontend = $ServiceName -eq 'frontend' -and $lowerCommandLine.Contains('serve_frontend.py') -and $lowerCommandLine.Contains($projectRootLower)
+    if ($commandLine -and $lowerCommandLine.Contains($projectRootLower)) {
         Stop-OwnedListener $Port $ServiceName
     }
 }
@@ -128,7 +131,7 @@ if (-not (Test-Backend)) {
     if (Test-Port 8000) { Stop-OwnedListener 8000 'backend' }
     Remove-Item $backendOut, $backendErr -Force -ErrorAction SilentlyContinue
     Start-Process -FilePath $python `
-        -ArgumentList @('-m', 'uvicorn', 'main:app', '--host', $bindHost, '--port', '8000') `
+        -ArgumentList @('-m', 'uvicorn', 'main:app', '--app-dir', ('"' + $backend + '"'), '--host', $bindHost, '--port', '8000') `
         -WorkingDirectory $backend `
         -WindowStyle Hidden `
         -RedirectStandardOutput $backendOut `
@@ -139,7 +142,7 @@ if (-not (Test-Frontend)) {
     if (Test-Port 5173) { Stop-OwnedListener 5173 'frontend' }
     Remove-Item $frontendOut, $frontendErr -Force -ErrorAction SilentlyContinue
     Start-Process -FilePath $python `
-        -ArgumentList @('-m', 'http.server', '5173', '--bind', $bindHost) `
+        -ArgumentList @( ('"' + (Join-Path $PSScriptRoot 'serve_frontend.py') + '"'), '--port', '5173', '--bind', $bindHost) `
         -WorkingDirectory $staticFrontend `
         -WindowStyle Hidden `
         -RedirectStandardOutput $frontendOut `
