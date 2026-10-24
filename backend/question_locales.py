@@ -5,7 +5,40 @@ from typing import Literal
 Locale = Literal['es', 'ru', 'en', 'de', 'fr', 'zh-Hans']
 LOCALES = ['es', 'ru', 'en', 'de', 'fr', 'zh-Hans']
 LOCALE_LABELS = ['Español', 'Русский', 'English', 'Deutsch', 'Français', '简体中文']
-QUESTION_FIELDS = 'id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,explanation_es,explanation_ru,source_id,source_page'
+QUESTION_FIELDS = 'id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,explanation_es,explanation_ru,source_id,source_page,correct_answer'
+
+TRANSLATION_FILE = __import__('pathlib').Path(__file__).resolve().parents[1] / 'data/question-translations-en-zh.json'
+
+def translation_source_hash(question):
+    import hashlib
+    fields = {key: question[key] for key in (
+        'question_es','answer_a','answer_b','answer_c','answer_d','explanation_es','correct_answer')}
+    return hashlib.sha256(json.dumps(fields, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+from functools import lru_cache
+@lru_cache(maxsize=2)
+def _load_learning_translations(path, modified):
+    try:
+        return json.loads(__import__('pathlib').Path(path).read_text(encoding='utf-8')).get('locales', {})
+    except (OSError, ValueError):
+        return {}
+
+def learning_translation(question, locale):
+    try:
+        catalog = _load_learning_translations(str(TRANSLATION_FILE), TRANSLATION_FILE.stat().st_mtime_ns)
+        value = catalog.get(locale, {}).get(str(question['id']))
+        if not value or value.get('source_hash') != translation_source_hash(question):
+            return None
+        if value.get('correct_answer') != question['correct_answer']:
+            return None
+        if set(value.get('options', {})) != set('ABCD'):
+            return None
+        if not all(isinstance(text, str) and text.strip() for text in [
+                value.get('question'), value.get('explanation'), *value['options'].values()]):
+            return None
+        return value
+    except (OSError, KeyError, TypeError):
+        return None
 
 
 def localize_questions(db, rows, locale: Locale = 'es'):
@@ -69,6 +102,16 @@ def localize_questions(db, rows, locale: Locale = 'es'):
                 options = {key: question['answer_'+key.lower()+'_ru'] for key in 'ABCD'}
                 explanation = question['explanation_ru']
                 content_locale = 'ru'
+        # Existing authored approval rules retain precedence; legacy study translations
+        # are explicitly machine-translated and invalidated when their source changes.
+        method = None
+        if question_id not in authored and locale in ('en', 'zh-Hans'):
+            study = learning_translation(question, locale)
+            if study:
+                prompt, options, explanation = study['question'], study['options'], study['explanation']
+                content_locale = locale
+                method = study['translation_method']
+        item['translation_method'] = method
         item.update(requested_locale=locale, content_locale=content_locale,
                     translation_available=content_locale == locale,
                     display_question=prompt, display_options=options)

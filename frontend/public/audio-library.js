@@ -11,15 +11,16 @@
     { id: 'naturalization', number: '06', title: '\u041d\u0430\u0442\u0443\u0440\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f', topic: '\u041d\u0430\u0442\u0443\u0440\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f', file: 'lesson-06-naturalization-full.mp3' },
   ]
 
-  const stateKey = 'colombia-exam-audio-library'
-  const loadState = () => {
+  const audioLocale = () => ['en','zh-Hans'].includes(L.current) ? L.current : 'ru'
+  const stateKey = () => 'colombia-exam-audio-library' + (audioLocale() === 'ru' ? '' : ':' + audioLocale())
+  const loadState = (key = stateKey()) => {
     try {
-      return JSON.parse(localStorage.getItem(stateKey) || '{}')
+      return JSON.parse(localStorage.getItem(key) || '{}')
     } catch {
       return {}
     }
   }
-  const saveState = (state) => localStorage.setItem(stateKey, JSON.stringify(state))
+  const saveState = (state, key = stateKey()) => localStorage.setItem(key, JSON.stringify(state))
   const formatTime = (seconds) => {
     if (!Number.isFinite(seconds) || seconds < 1) return '0:00'
     const total = Math.floor(seconds)
@@ -76,6 +77,7 @@
   }
 
   function render(autoplay = false) {
+    const playerStateKey = stateKey()
     const continuous = playAll
     if (audio) audio.pause()
     playAll = continuous
@@ -89,7 +91,7 @@
       else target.prepend(card)
     }
 
-    const state = loadState()
+    const state = loadState(playerStateKey)
     currentIndex = Number.isInteger(state.currentIndex) ? Math.min(Math.max(state.currentIndex, 0), lessons.length - 1) : currentIndex
     const current = lessons[currentIndex]
     const currentPosition = state.positions?.[current.id] || 0
@@ -106,7 +108,7 @@
       <div class="audio-library-head">
         <div>
           <h2>${text.title}</h2>
-          <p>${text.intro}</p>
+          <p>${text.intro}</p><p class="audio-translation-note" lang="en">${audioLocale() === 'en' ? 'Full English translation of the existing study lesson; automatically checked.' : audioLocale() === 'zh-Hans' ? '现有学习课程的完整中文译本，已自动核对。' : ''}</p>
         </div>
         <div class="audio-library-actions">
           <button class="continue">${text.continue}</button>
@@ -118,10 +120,10 @@
       <div class="audio-player">
         <strong>${current.number}. ${ui(current.id+'Title')}</strong>
         <div class="audio-current-meta">
-          <span>${L.escape(L.text(current.topic))}</span>
+          <span>${L.escape(L.text(current.topic))}</span><span lang="en">${{ru:'Русский',en:'English','zh-Hans':'简体中文'}[audioLocale()]}</span>
           <span>${currentPosition ? ui('audioSaved',{time:formatTime(currentPosition)}) : text.fromStart}</span>
         </div>
-        <audio controls preload="metadata" src="/audio/${current.file}" data-current-id="${current.id}"></audio>
+        <audio controls preload="metadata" src="/audio/${audioLocale() === 'ru' ? '' : audioLocale() + '/'}${current.file}" data-current-id="${current.id}"></audio>
         <div class="audio-status" data-ui-status="ready">${text.ready}</div>
         <div class="audio-progress-line"><i></i></div>
       </div>
@@ -151,10 +153,10 @@
     }
 
     function persist() {
-      const next = loadState()
+      const next = loadState(playerStateKey)
       next.positions = next.positions || {}
       if (player.currentTime > 0) next.positions[current.id] = Math.floor(player.currentTime)
-      saveState(next)
+      saveState(next, playerStateKey)
     }
 
     player.addEventListener('loadedmetadata', () => {
@@ -170,14 +172,14 @@
       persist()
     })
     player.addEventListener('ended', () => {
-      const next = loadState()
+      const next = loadState(playerStateKey)
       next.positions = next.positions || {}
       next.positions[current.id] = 0
-      saveState(next)
+      saveState(next, playerStateKey)
       if (playAll && currentIndex < lessons.length - 1) {
         currentIndex += 1
         next.currentIndex = currentIndex
-        saveState(next)
+        saveState(next, playerStateKey)
         render(true)
       }
     })
@@ -195,11 +197,11 @@
       playAll = false
       player.pause()
       player.currentTime = 0
-      const next = loadState()
+      const next = loadState(playerStateKey)
       next.currentIndex = currentIndex
       next.positions = next.positions || {}
       next.positions[current.id] = 0
-      saveState(next)
+      saveState(next, playerStateKey)
       bar.style.width = '0'
     }
     card.querySelector('.all').onclick = () => {
@@ -210,9 +212,9 @@
       button.onclick = () => {
         currentIndex = Number(button.dataset.index)
         playAll = false
-        const next = loadState()
+        const next = loadState(playerStateKey)
         next.currentIndex = currentIndex
-        saveState(next)
+        saveState(next, playerStateKey)
         render()
         const nextCard = document.querySelector('.audio-library')
         nextCard?.querySelector('.continue')?.click()
@@ -221,15 +223,7 @@
     if (autoplay) playCurrent()
   }
 
-  window.addEventListener('colombia:locale-changed', () => {
-    const card=document.querySelector('.audio-library'); if(!card)return
-    const state=loadState(), current=lessons[currentIndex], position=state.positions?.[current.id]||0
-    const labels={'.audio-library-head h2':text.title,'.audio-library-head p':text.intro,'.continue':text.continue,'.pause':text.pause,'.stop':text.stop,'.all':text.playAll,'.audio-lessons-title':text.otherModules,'.audio-player strong':current.number+'. '+L.ui(current.id+'Title')}
-    Object.entries(labels).forEach(([selector,value])=>{card.querySelector(selector).textContent=value})
-    const meta=card.querySelectorAll('.audio-current-meta span');meta[0].textContent=L.text(current.topic);meta[1].textContent=position?L.ui('audioSaved',{time:formatTime(position)}):text.fromStart
-    const status=card.querySelector('.audio-status');status.textContent=text[status.dataset.uiStatus||'ready']
-    card.querySelectorAll('[data-index]').forEach(button=>{const lesson=lessons[Number(button.dataset.index)],pos=state.positions?.[lesson.id]||0;button.querySelector('b').textContent=lesson.number+'. '+L.ui(lesson.id+'Title');button.querySelector('span').textContent=L.text(lesson.topic);button.querySelector('mark').textContent=pos?L.ui('audioListenFrom',{time:formatTime(pos)}):text.start})
-  })
+  window.addEventListener('colombia:locale-changed', () => { playAll = false; render() })
 
   window.addEventListener('pagehide', () => audio?.pause())
 

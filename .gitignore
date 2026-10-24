@@ -35,3 +35,6 @@ Thumbs.db
 .vscode/
 backend/.venv-broken-*/
 frontend/stable-check.png
+
+# Resumable translation checkpoints (final catalog is tracked)
+data/localized-content/

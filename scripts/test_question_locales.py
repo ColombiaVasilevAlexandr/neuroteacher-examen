@@ -83,5 +83,32 @@ class QuestionLocaleTests(unittest.TestCase):
         self.assertEqual(self.get_question('ru')['content_locale'],'es')
         self.assertEqual(self.client.get('/api/questions',params={'locale':'xx'}).status_code,422)
 
+    def test_learning_translation_hash_and_key_privacy(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        import question_locales
+        with main.conn() as db:
+            question = dict(db.execute("SELECT * FROM questions WHERE id=1").fetchone())
+        translated = {'question': 'Translated study question', 'options': {k:'choice '+k for k in 'ABCD'},
+                      'explanation': 'Translated explanation', 'correct_answer':question['correct_answer'],
+                      'translation_method':'machine_translation_with_second_pass',
+                      'source_hash':question_locales.translation_source_hash(question)}
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/'translations.json'
+            path.write_text(json.dumps({'locales':{'en':{'1':translated}}}),encoding='utf-8')
+            with patch.object(question_locales,'TRANSLATION_FILE',path):
+                item = self.get_question('en')
+                self.assertEqual(item['display_question'],translated['question'])
+                self.assertEqual(item['content_locale'],'en')
+                self.assertNotIn('correct_answer',item)
+                self.assertNotIn('display_explanation',item)
+                response=self.client.post('/api/questions/1/answer',params={'locale':'en'},
+                                          json={'answer':question['correct_answer']})
+                self.assertEqual(response.json()['display_explanation'],translated['explanation'])
+                with main.conn() as db:
+                    db.execute("UPDATE questions SET question_es=question_es||' changed' WHERE id=1")
+                self.assertEqual(self.get_question('en')['content_locale'],'es')
+
 if __name__=='__main__':
     unittest.main(defaultTest='QuestionLocaleTests',verbosity=2)
