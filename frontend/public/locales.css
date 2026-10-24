@@ -1,3 +1,6 @@
-.language{max-width:100%;min-width:150px;padding:10px;color:inherit;background:#102630;border:1px solid #39606a;border-radius:8px;font:inherit;cursor:pointer}
+.language{max-width:100%;min-width:150px;padding:10px;color:#eefafa;background:#102630;border:1px solid #39606a;border-radius:8px;font:inherit;font-size:14px;line-height:1.4;cursor:pointer}
 .language option{background:#102630;color:#eefafa}
 .locale-fallback{padding:9px 12px;border-left:3px solid #ffd12a;color:#d8e8ee;font-size:14px;line-height:1.5}
+
+.sidebar select.language{display:block;width:100%;min-width:0;min-height:42px;text-align:start;color-scheme:dark}
+.sidebar select.language:focus-visible{outline:2px solid #ffd12a;outline-offset:3px}
