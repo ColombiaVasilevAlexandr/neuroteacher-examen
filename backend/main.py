@@ -713,14 +713,21 @@ def dashboard():
     }
 
 @app.get('/api/materials/chapters')
-def material_chapters():
+def material_chapters(locale: Literal["es", "ru"] = "es"):
+    if locale == "ru":
+        return [
+            {"title": "Geografía — archivo 2021", "title_ru": "География — архив 2021", "page_number": 6},
+            {"title": "Historia — archivo 2021", "title_ru": "История — архив 2021", "page_number": 28},
+            {"title": "Constitución — archivo 2021", "title_ru": "Конституция — архив 2021", "page_number": 76},
+            {"title": "Castellano — archivo 2021", "title_ru": "Испанский язык — архив 2021", "page_number": 121},
+        ]
     # Curated learning map. Raw OCR/PDF headings remain in material_chapters,
     # but are deliberately not shown as course navigation.
     return [
         {"title": "Cultura y sociedad", "title_ru": "Культура и общество", "page_number": 4},
-        {"title": "Geografía de Colombia", "title_ru": "География Колумбии", "page_number": 63},
+        {"title": "Geografía de Colombia", "title_ru": "География Колумбии", "page_number": 56},
         {"title": "Historia de Colombia: cronología", "title_ru": "История Колумбии: хронология", "page_number": 108},
-        {"title": "Constitución y estructura del Estado", "title_ru": "Конституция и устройство государства", "page_number": 154},
+        {"title": "Constitución y estructura del Estado", "title_ru": "Конституция и устройство государства", "page_number": 137},
         {"title": "Castellano: alfabeto y vocabulario", "title_ru": "Испанский язык: алфавит и словарь", "page_number": 160},
         {"title": "Castellano: nombres comunes y propios", "title_ru": "Испанский язык: нарицательные и собственные имена", "page_number": 170},
     ]

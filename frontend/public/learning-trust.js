@@ -3,7 +3,7 @@
     const footer = document.querySelector('.app-shell footer')
     if (footer && !footer.querySelector('.official-source-note')) {
       const note = document.createElement('small'); note.className='official-source-note'
-      note.textContent='Материалы: Colombia, nuestra casa · официальный учебный источник Cancillería de Colombia.'
+      note.textContent='Источники: пособие 2024 года, архивное издание 2021 года и отдельно обозначенные учебные заметки.'
       footer.append(note)
     }
     document.querySelectorAll('.feedback').forEach(feedback => {

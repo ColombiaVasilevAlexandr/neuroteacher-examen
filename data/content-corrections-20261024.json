@@ -1,0 +1,332 @@
+{
+  "6": {
+    "question_es": "¿Qué río se asocia históricamente con una de las principales vías de comunicación de Colombia?",
+    "question_ru": "Какая река исторически служила одним из главных путей сообщения Колумбии?",
+    "explanation_es": "El Magdalena ha sido una importante vía de comunicación y transporte. La pregunta se refiere a ese papel histórico, no a una clasificación absoluta de los ríos.",
+    "explanation_ru": "Магдалена исторически была важным путём сообщения и перевозок. Вопрос касается этой роли, а не безусловного рейтинга рек."
+  },
+  "22": {
+    "question_es": "¿Cuál es el nombre de la especie de orquídea reconocida como flor nacional de Colombia?",
+    "question_ru": "Как называется вид орхидеи, признанный национальным цветком Колумбии?",
+    "answer_a": "Cattleya trianae",
+    "answer_a_ru": "Каттлея Триана",
+    "answer_c": "Girasol",
+    "answer_c_ru": "Подсолнечник",
+    "explanation_es": "La flor nacional es la orquídea Cattleya trianae. «Orquídea» es una categoría más amplia, por eso no se ofrece como una alternativa distinta a esta especie.",
+    "explanation_ru": "Национальный цветок — орхидея Cattleya trianae. «Орхидея» — более широкая категория, поэтому она не предлагается как отдельный от этого вида ответ."
+  },
+  "48": {
+    "source_id": 1,
+    "source_page": 28
+  },
+  "60": {
+    "question_es": "Según la guía, ¿qué festival teatral de Bogotá comenzó en 1988?",
+    "question_ru": "Какой театральный фестиваль Боготы, согласно пособию, начался в 1988 году?",
+    "answer_b": "Festival Internacional de Cine de Cartagena",
+    "answer_b_ru": "Международный кинофестиваль Картахены",
+    "explanation_es": "La guía sitúa el inicio del festival teatral de Bogotá en 1988. Se evita presentar sus dos denominaciones como si fueran eventos diferentes.",
+    "explanation_ru": "Пособие связывает начало театрального фестиваля Боготы с 1988 годом. Два названия одного события не используются как разные варианты ответа."
+  },
+  "162": {
+    "source_id": 1,
+    "source_page": 117
+  },
+  "164": {
+    "question_es": "Según la cronología de la guía, ¿qué período corresponde a la República Liberal?",
+    "question_ru": "Какой период соответствует Либеральной республике в хронологии пособия?",
+    "explanation_es": "La cronología identifica 1930-1946 como República Liberal. No debe confundirse con el período conocido como La Violencia.",
+    "explanation_ru": "В хронологии 1930–1946 годы обозначены как Либеральная республика. Этот период нельзя смешивать с периодом La Violencia.",
+    "source_id": 1,
+    "source_page": 108
+  },
+  "165": {
+    "source_id": 1,
+    "source_page": 140
+  },
+  "166": {
+    "source_id": 1,
+    "source_page": 117
+  },
+  "220": {
+    "source_id": 1,
+    "source_page": 127
+  },
+  "282": {
+    "source_id": 1,
+    "source_page": 146
+  },
+  "303": {
+    "source_id": 1,
+    "source_page": 151
+  },
+  "304": {
+    "source_id": 1,
+    "source_page": 147
+  },
+  "338": {
+    "question_es": "¿Cuántas letras consonantes incluye el alfabeto español presentado en la guía?",
+    "question_ru": "Сколько согласных букв содержит испанский алфавит, представленный в пособии?",
+    "explanation_es": "El alfabeto presentado tiene 27 letras: cinco vocales y 22 consonantes. Se cuentan letras, no fonemas.",
+    "explanation_ru": "Представленный алфавит содержит 27 букв: пять гласных и 22 согласные. Речь идёт о буквах, а не о фонемах."
+  },
+  "358": {
+    "source_id": 1,
+    "source_page": 178
+  },
+  "367": {
+    "question_es": "¿Cuál es el plural correcto de «autobús»?",
+    "question_ru": "Как правильно образовать множественное число испанского слова autobús?",
+    "answer_a": "Autobuses",
+    "answer_b": "Autobúses",
+    "answer_c": "Autobúes",
+    "answer_d": "Autobuss",
+    "answer_a_ru": "Autobuses",
+    "answer_b_ru": "Autobúses",
+    "answer_c_ru": "Autobúes",
+    "answer_d_ru": "Autobuss",
+    "explanation_es": "«Autobús» termina en -s y es una palabra aguda; su plural es «autobuses», sin tilde. No todos los sustantivos terminados en -s siguen esta regla: «el lunes / los lunes» no cambia.",
+    "explanation_ru": "Autobús оканчивается на -s и имеет ударение на последнем слоге; множественное число — autobuses, без знака ударения. Правило нельзя распространять на все слова с -s: el lunes / los lunes не меняется."
+  },
+  "397": {
+    "question_es": "Según la guía, ¿qué marcador temporal puede acompañar al pretérito perfecto?",
+    "question_ru": "Какой временной маркер, согласно пособию, может сопровождать pretérito perfecto?",
+    "explanation_es": "La guía incluye «ya» entre los marcadores que pueden acompañar al pretérito perfecto. «Ya» también puede aparecer con otros tiempos; no determina el tiempo verbal por sí solo.",
+    "explanation_ru": "В пособии ya приведено среди маркеров, которые могут сопровождать pretérito perfecto. Оно употребляется и с другими временами и само по себе не определяет время глагола."
+  },
+  "418": {
+    "source_id": 3,
+    "source_page": null
+  },
+  "434": {
+    "question_es": "¿Qué pico menciona la guía de 2024 como el más alto de Colombia?",
+    "question_ru": "Какая вершина названа самой высокой в Колумбии в пособии 2024 года?",
+    "source_id": 1,
+    "source_page": 71
+  },
+  "435": {
+    "question_es": "¿Cuál es la superficie terrestre de Colombia indicada por el IGAC?",
+    "question_ru": "Какова площадь сухопутной территории Колумбии по данным IGAC?",
+    "source_id": 6,
+    "source_page": null,
+    "source_quote": "Superficie total: 1.141.748 km²"
+  },
+  "436": {
+    "question_es": "¿Qué opción recoge la diversidad de poblaciones colombianas sin reducirla a un solo grupo?",
+    "question_ru": "Какой вариант отражает разнообразие населения Колумбии, не сводя его к одной группе?",
+    "source_id": 4,
+    "source_page": null
+  },
+  "453": {
+    "question_es": "Según la guía, ¿qué cordillera se ubica al este del país y forma una frontera natural con Venezuela?",
+    "question_ru": "Какой хребет, согласно пособию, расположен на востоке страны и образует естественную границу с Венесуэлой?",
+    "explanation_es": "La guía ubica la Cordillera Oriental al este del país. La pregunta trata de su ubicación, no de una comparación no documentada sobre la antigüedad de las cordilleras.",
+    "explanation_ru": "В пособии Восточная Кордильера расположена на востоке страны. Вопрос касается её положения, а не неподтверждённого сравнения геологического возраста хребтов.",
+    "source_id": 1,
+    "source_page": 89
+  },
+  "454": {
+    "question_es": "¿Qué cordillera corre paralela a la costa del Pacífico, según la guía?",
+    "question_ru": "Какой хребет тянется параллельно тихоокеанскому побережью, согласно пособию?",
+    "explanation_es": "La Cordillera Occidental corre paralela a la costa del Pacífico. No se utiliza la afirmación no documentada de que sea la cordillera más joven.",
+    "explanation_ru": "Западная Кордильера тянется параллельно тихоокеанскому побережью. Неподтверждённое утверждение о том, что это самый молодой хребет, не используется.",
+    "source_id": 1,
+    "source_page": 77
+  },
+  "455": {
+    "source_id": 1,
+    "source_page": 56
+  },
+  "480": {
+    "explanation_es": "Según la estimación citada en la guía de 2021, unos ocho millones de personas habitaban el territorio de la actual Colombia al llegar los españoles."
+  },
+  "481": {
+    "explanation_es": "La guía indica que desde 1535 se organizaron expediciones hacia el interior del territorio."
+  },
+  "482": {
+    "explanation_es": "Según el texto, Gonzalo Jiménez de Quesada partió con 800 hombres en la expedición de 1536."
+  },
+  "495": {
+    "answer_a": "Pedro Alcántara Herrán",
+    "answer_b": "Tomás Cipriano de Mosquera",
+    "answer_c": "Rafael Núñez",
+    "answer_d": "Mariano Ospina Rodríguez",
+    "explanation_es": "Tras la guerra y la formación de nuevas alianzas políticas, Pedro Alcántara Herrán llegó al poder en 1841."
+  },
+  "496": {
+    "answer_a": "Reformas favorables a la Iglesia y contrarias a las ideas de Bentham",
+    "answer_b": "Reformas para separar la Iglesia del Estado",
+    "answer_c": "Reformas favorables a las ideas individualistas de Bentham",
+    "answer_d": "Reformas para centralizar la educación",
+    "explanation_es": "Herrán impulsó reformas educativas favorables a la Iglesia y contrarias a las ideas individualistas de Bentham."
+  },
+  "497": {
+    "answer_a": "El sufragio se restringió a propietarios y hombres acomodados mayores de 25 años",
+    "answer_b": "El sufragio se concedió a todos los hombres mayores de 21 años",
+    "answer_c": "El Estado se organizó como una federación",
+    "answer_d": "La Iglesia se separó del Estado",
+    "explanation_es": "Según la guía de 2021, la Constitución de 1843 restringió el sufragio y reforzó la centralización del Estado."
+  },
+  "507": {
+    "explanation_es": "La guía atribuye a Victor Hugo la expresión «constitución para ángeles» al referirse a la Constitución de 1863."
+  },
+  "508": {
+    "explanation_es": "Después de la Guerra de los Mil Días se produjo la separación de Panamá de Colombia."
+  },
+  "522": {
+    "source_id": 1,
+    "source_page": 140
+  },
+  "523": {
+    "source_id": 5,
+    "source_page": null,
+    "source_quote": "Son fines esenciales del Estado: servir a la comunidad, promover la prosperidad general y garantizar la efectividad de los principios, derechos y deberes consagrados en la Constitución;"
+  },
+  "524": {
+    "source_id": 1,
+    "source_page": 139
+  },
+  "564": {
+    "source_id": 1,
+    "source_page": 117
+  },
+  "565": {
+    "source_id": 1,
+    "source_page": 118
+  },
+  "566": {
+    "question_es": "¿En qué año ocurrió el Grito de Independencia que se conmemora el 20 de julio?",
+    "question_ru": "В каком году произошёл Гrito de Independencia, который отмечают 20 июля?",
+    "explanation_es": "El acontecimiento conmemorado el 20 de julio corresponde a 1810. La consolidación militar de la independencia en 1819 es otro momento del proceso.",
+    "explanation_ru": "Событие, отмечаемое 20 июля, относится к 1810 году. Военное закрепление независимости в 1819 году — другой этап этого процесса.",
+    "source_id": 1,
+    "source_page": 117
+  },
+  "579": {
+    "explanation_es": "Durante la crisis de la monarquía, el cabildo de Cali juró lealtad al rey."
+  },
+  "580": {
+    "explanation_es": "La guía de 2021 denomina «Patria Boba» al período de 1810 a 1814."
+  },
+  "581": {
+    "explanation_es": "El mando de la expedición española para restablecer el control colonial se encargó a Pablo Morillo."
+  },
+  "585": {},
+  "586": {},
+  "587": {
+    "explanation_es": "El recurso de Señal Memoria se titula «¿Qué fue el movimiento de juntas?» y está identificado como un pódcast."
+  },
+  "597": {
+    "explanation_es": "La guía describe la entrada de fuerzas peruanas en Leticia y las reclamaciones territoriales sobre esa zona."
+  },
+  "598": {
+    "explanation_es": "López Pumarejo introdujo el principio de la función social de la propiedad, que permitía la expropiación en determinados casos."
+  },
+  "599": {
+    "explanation_es": "La guía caracteriza esos gobiernos por una pausa en las reformas y, en ciertos casos, por el retroceso de transformaciones anteriores."
+  },
+  "625": {
+    "explanation_es": "La guía incluye «La luz de la noche», de la Comisión de la Verdad, entre los pódcast recomendados."
+  },
+  "626": {
+    "explanation_es": "La guía recomienda el video «Explicación de los acuerdos de paz con las FARC», de la Fundación Ideas para la Paz."
+  },
+  "686": {
+    "explanation_es": "Los infinitivos se agrupan en tres conjugaciones según sus terminaciones: -ar, -er e -ir."
+  },
+  "687": {
+    "explanation_es": "La terminación verbal aporta información sobre tiempo, modo, número y persona."
+  },
+  "688": {
+    "explanation_es": "En el infinitivo «escribir», la raíz es «escrib-» y la terminación es «-ir»."
+  },
+  "690": {
+    "source_id": 1,
+    "source_page": 181
+  },
+  "691": {
+    "answer_d": "Mamá todavía no han llegado a casa.",
+    "answer_d_ru": "Mamá todavía no han llegado a casa — неверное согласование вспомогательного глагола.",
+    "explanation_es": "«Mamá» es tercera persona singular: exige «ha» y el participio «llegado». En esta oración, «todavía no» precede al auxiliar.",
+    "explanation_ru": "Mamá — третье лицо единственного числа: нужны ha и причастие llegado. В этом предложении todavía no стоит перед вспомогательным глаголом."
+  },
+  "692": {
+    "question_es": "¿Qué tiempo verbal se forma con el presente de «haber» y un participio pasado?",
+    "question_ru": "Какое время образуется из настоящего времени глагола haber и причастия прошедшего времени?",
+    "explanation_es": "El pretérito perfecto se forma con el presente de haber y el participio pasado: he hablado, has comido, ha vivido.",
+    "explanation_ru": "Pretérito perfecto образуется из настоящего времени haber и причастия прошедшего времени: he hablado, has comido, ha vivido.",
+    "source_id": 1,
+    "source_page": 181
+  },
+  "701": {
+    "explanation_es": "El futuro simple expresa acciones que se realizarán próximamente o en un momento posterior."
+  },
+  "702": {
+    "explanation_es": "La guía menciona «luego», «más tarde», «el año próximo» y «el mes que viene» entre los marcadores temporales del futuro simple."
+  },
+  "703": {
+    "explanation_es": "En el futuro simple se utilizan las mismas terminaciones personales para las tres conjugaciones."
+  },
+  "716": {
+    "question_es": "Completa con el adjetivo más adecuado entre las opciones: «El té está ___» — se habla de su temperatura.",
+    "question_ru": "Выберите наиболее подходящее прилагательное из вариантов: El té está ___ — речь идёт о температуре чая."
+  },
+  "717": {
+    "question_es": "Completa con la forma que concuerda en femenino plural: «Las instalaciones son ___».",
+    "question_ru": "Заполните пропуск формой женского рода множественного числа: Las instalaciones son ___."
+  },
+  "718": {
+    "question_es": "Completa la frase que indica que el pantalón aprieta: «El pantalón me queda ___».",
+    "question_ru": "Заполните пропуск в предложении о тесных брюках: El pantalón me queda ___."
+  },
+  "739": {
+    "explanation_es": "La sección ofrece nociones iniciales y básicas del español a personas para quienes esta no es su primera lengua."
+  },
+  "740": {
+    "explanation_es": "El apartado presenta la construcción de oraciones como unidades de comunicación formadas por sujeto y predicado."
+  },
+  "743": {
+    "question_es": "¿Cuántos dígrafos presenta la guía al explicar la escritura del español?",
+    "question_ru": "Сколько диграфов приведено в пособии при объяснении испанской письменности?",
+    "explanation_es": "La guía presenta cinco dígrafos: ch, gu, ll, qu y rr. Los dígrafos son combinaciones de dos letras; no son cinco letras adicionales del alfabeto.",
+    "explanation_ru": "В пособии приведены пять диграфов: ch, gu, ll, qu и rr. Это сочетания двух букв, а не пять дополнительных букв алфавита.",
+    "source_id": 1,
+    "source_page": 160
+  },
+  "752": {
+    "question_es": "¿Qué profesión completa de forma más adecuada «Diego es ___ y trabaja en un bar»?",
+    "question_ru": "Какая профессия наиболее подходит для предложения Diego es ___ y trabaja en un bar?",
+    "source_id": 2,
+    "source_page": 151,
+    "source_quote": "Слова: mesero,ser и подходящей профессией. Слова: mesero, profesora,\nsecretaria, ciclistas, psicóloga,\nmédicos, enfermera, odontólogos.\nПример:\nAna es enfermera y\ntrabaja en el hospital. - Ана медсестра и работает в больнице.\n• Diego _______________________ y trabaja en un bar.\n• Nubia _______________________ en un colegio bilingüe.\n• Alejandro, Fernando y\nMiguel __________________ de alto rendimiento.\n• ¿Ustedes _______________________ de esta clínica?\n• Yo ___________________________ de infancia y adolescencia.\n• Maritza ___________________________ del Dr. Portillo.\n• Nosotros _________ un grupo\nde __________________ especializados\nen ortod"
+  },
+  "470": {
+    "source_id": 2,
+    "source_page": 27,
+    "source_quote": "Рекомендуемые источники\nдля\nрасширения знаний\nВ оригинальном пособии\nприведены следующие\nматериалы:\n•\nhttps://es.scribd.com/document/37\n2309598/Cuenca-Del-Rio-Atrato\n•\nhttps://comunidadplanetaazul.com\n/vertientes-hidrograficas-de-colom\nbia/\n• Bernal (2017). Geografía\nHumana.\nhttps://digitk.areandina.edu.co/bits\ntream/handle/areandina/\n1457/Geograf%C3%ADa%20huma\nna%20de%20Colombia.pdf?seque\nnce=1&isAllowed=y\n• Ministerio de Educación\nNacional (2014). Ciencias\nSociales. Escuela Nueva.\nhttps://\nredes.colombiaaprende.edu.co/ntg/m\nen/archivos/Referentes_Calidad/Model\nos_Flexibles/\nEscuela_Nueva/Guias_para_estudiante\ns/CS_Grado4_02.pdf\n• Portafolio (2021). Población de\nColombia ya bordearía los 51\nmillones. https://www.portafolio.co/\ninternacional/poblacion-de-colombia\n-cuantos-habitantes-tiene-colombia-\n2021-549547\n• Pérez, Gerson. Dinámica\ndemográfica y desarrollo regional\nen Colombia. https://\nwww.banrep.gov.co/sites/default/fil\nes/publicaciones/archivos/\nlbr_desigualdades_regionales.pdf#p\nage=161\n• Universidad Católica de Oriente.\nSectores productivos de la\neconomía. https://www.uco.edu.co/\nova/OVA%20Economia%20Colombi\nana/Objetos%20informativos/\nUnidad%201/2.%20SECTORES%20P\nRODUCTIVOS%20EN%20COLOMBIA.\npdf\n• Actividades económicas. Sectores\nde la economía de Colombia.\nhttps://\nwww.actividadeseconomicas.org/20\n18/10/sectores-economicos-de-colo\nmbia.html"
+  },
+  "571": {
+    "source_id": 2,
+    "source_page": 32,
+    "source_quote": "Это сопровождалось общественным разделением труда,\nодомашниванием животных, например морской свинки и индейки, а также\nвозникновением\nпростого обмена между соседями, который постепенно усложнялся по мере открытия\nновых\nмаршрутов и связей с другими группами.\nОдним из результатов этих процес"
+  },
+  "645": {
+    "source_id": 2,
+    "source_page": 104,
+    "source_quote": "Corte Constitucional. Sentencia C-102/2018.\nhttps://www.corteconstitucional.gov.co/relatoria/\n2018/C"
+  },
+  "650": {
+    "source_id": 2,
+    "source_page": 105,
+    "source_quote": "/2014; C-150/2015.\nЗаконодательная инициатива\n• Corte Constitucional.\nSentencia\nC-1707/200\n0.\nhttps://www.corteconstitucional.gov.co/relatoria/\n2000/C-1707-00.htm\n• Также: C-443/1996; C-932/2009; C-031/2017; C-385/1997.\nОбщие исто"
+  },
+  "676": {
+    "source_id": 2,
+    "source_page": 136,
+    "source_quote": "Существительные, обозначающие мужчин\nel hijo, el padre, el mesero, el\ndoctor, el deportista, el bailarín,\nel portero, el taxista.\nСуществительные, обозначающие женщин\nla hija, la madre,\nla mesera, la doctora, la deportista, la\nbailarina, la portera,\nla taxista."
+  },
+  "684": {
+    "source_id": 2,
+    "source_page": 138,
+    "source_quote": "perro -aje\ngaraje, peaje -an, -en, -in, -on, -unpan, andén, arlequín, camión, atún\n-ar, -er, -or\npalomar, taller, profesor\n-ate, -ete, -ote chocolate, tapete\n-és-és arnés"
+  }
+}

@@ -1,43 +1,42 @@
-"""Extract the official study guide into traceable local data.
-
-This importer does not create questions. It preserves page numbers so editorial
-review can cite a page before marking any question as verified.
-"""
+"""Import one guide edition into its own source namespace."""
+import argparse
 import json
+import logging
 import sqlite3
-import sys
+from datetime import datetime
 from pathlib import Path
 from pypdf import PdfReader
 
-ROOT = Path(__file__).resolve().parent.parent
-PDF = ROOT / "data" / "official_sources" / "colombia_nuestra_casa_ru.pdf"
-DB = ROOT / "database" / "colombia_exam.db"
-OUT = ROOT / "data" / "imports" / "colombia_nuestra_casa_pages.json"
-
-def is_heading(line: str) -> bool:
-    compact = ' '.join(line.split())
-    letters = [c for c in compact if c.isalpha()]
-    return 4 <= len(compact) <= 110 and len(letters) > 3 and compact == compact.upper()
+ROOT = Path(__file__).resolve().parents[1]
 
 def main():
-    if not PDF.exists():
-        raise SystemExit(f"PDF not found: {PDF}")
-    OUT.parent.mkdir(exist_ok=True)
-    reader = PdfReader(PDF)
-    pages, chapters = [], []
-    for number, page in enumerate(reader.pages, start=1):
-        text = page.extract_text() or ""
-        pages.append({"page": number, "text": text})
-        for line in text.splitlines():
-            if is_heading(line):
-                chapters.append({"title": ' '.join(line.split()), "page": number})
-    OUT.write_text(json.dumps({"source": "Колумбия — наш дом (русский перевод)", "pages": pages, "chapters": chapters}, ensure_ascii=False), encoding="utf-8")
-    with sqlite3.connect(DB) as db:
-        db.execute("DELETE FROM material_pages WHERE source_id=1")
-        db.execute("DELETE FROM material_chapters WHERE source_id=1")
-        db.executemany("INSERT INTO material_pages(source_id,page_number,text) VALUES(1,?,?)", [(x["page"], x["text"]) for x in pages])
-        db.executemany("INSERT INTO material_chapters(source_id,title,page_number) VALUES(1,?,?)", [(x["title"], x["page"]) for x in chapters])
-    print(f"Imported {len(pages)} pages and indexed {len(chapters)} chapter headings.")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--locale", choices=["es", "ru"], default="es")
+    parser.add_argument("--db", type=Path, default=ROOT / "database/colombia_exam.db")
+    args = parser.parse_args()
+    spanish = args.locale == "es"
+    source_id = 1 if spanish else 2
+    filename = "colombia_nuestra_casa.pdf" if spanish else "colombia_nuestra_casa_ru.pdf"
+    pdf = ROOT / "frontend/public" / filename
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
+    reader = PdfReader(pdf)
+    expected = 190 if spanish else 179
+    if len(reader.pages) != expected:
+        raise ValueError("Unexpected guide edition; existing data was not changed")
+    pages = [(i, page.extract_text() or "") for i, page in enumerate(reader.pages, 1)]
+    db = sqlite3.connect(args.db)
+    backup = args.db.with_name(args.db.stem + ".backup-import-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".db")
+    with sqlite3.connect(backup) as target:
+        db.backup(target)
+    with db:
+        db.execute("INSERT OR REPLACE INTO sources(id,title,url,document_type) VALUES(?,?,?,?)",
+                   (source_id, "Colombia, nuestra casa — 2024" if spanish else "Guía 2021 — traducción rusa (archivo)",
+                    "/" + filename, "official_study_guide" if spanish else "archived_study_guide_translation"))
+        db.execute("DELETE FROM material_pages WHERE source_id=?", (source_id,))
+        db.executemany("INSERT INTO material_pages(source_id,page_number,text) VALUES(?,?,?)",
+                       [(source_id, page, text) for page, text in pages])
+    db.close()
+    print(f"Imported {len(pages)} pages into source {source_id}; other editions and questions preserved.")
 
 if __name__ == "__main__":
     main()

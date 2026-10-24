@@ -5,7 +5,7 @@ from typing import Literal
 Locale = Literal['es', 'ru', 'en', 'de', 'fr', 'zh-Hans']
 LOCALES = ['es', 'ru', 'en', 'de', 'fr', 'zh-Hans']
 LOCALE_LABELS = ['Español', 'Русский', 'English', 'Deutsch', 'Français', '简体中文']
-QUESTION_FIELDS = 'id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,explanation_es,explanation_ru'
+QUESTION_FIELDS = 'id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,explanation_es,explanation_ru,source_id,source_page'
 
 
 def localize_questions(db, rows, locale: Locale = 'es'):
@@ -18,6 +18,7 @@ def localize_questions(db, rows, locale: Locale = 'es'):
     base = {row['id']: dict(row) for row in db.execute(
         f'SELECT {QUESTION_FIELDS} FROM questions WHERE id IN ({marks})', tuple(ids))}
     tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    sources = {row['id']: dict(row) for row in db.execute('SELECT * FROM sources')}
     authored = set()
     translations = {}
     if {'authored_imports', 'authored_localizations'} <= tables:
@@ -33,6 +34,13 @@ def localize_questions(db, rows, locale: Locale = 'es'):
         question = base.get(question_id)
         if question is None:
             continue
+        source = sources.get(question.get('source_id'), {})
+        url = source.get('url', '')
+        if question.get('source_page') and url.endswith('.pdf'):
+            url += '#page=' + str(question['source_page'])
+        item.update(source_id=question.get('source_id'), source_page=question.get('source_page'),
+                    source_title=source.get('title', ''), source_url=url,
+                    source_kind=source.get('document_type', ''))
         if question_id in authored:
             for field in ('question_ru', 'answer_a_ru', 'answer_b_ru', 'answer_c_ru', 'answer_d_ru', 'explanation_ru'):
                 if field in item:

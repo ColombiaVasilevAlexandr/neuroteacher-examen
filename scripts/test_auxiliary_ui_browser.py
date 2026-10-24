@@ -122,10 +122,10 @@ with tempfile.TemporaryDirectory() as folder:
             page.locator('#qa-pdf + .pdf-language-switcher').wait_for()
             assert page.locator('#qa-pdf').get_attribute('href')=='/colombia_nuestra_casa.pdf#page=25'
             page.locator('#qa-pdf + .pdf-language-switcher [data-pdf="ru"]').click()
-            assert page.locator('#qa-pdf').get_attribute('href')=='/colombia_nuestra_casa_ru.pdf#page=25'
+            assert page.locator('#qa-pdf').get_attribute('href')=='/colombia_nuestra_casa_ru.pdf#page=1'
             page.select_option('select.language','fr')
-            assert page.locator('#qa-pdf').inner_text()==ui('pdfRussian')
-            assert page.locator('#qa-pdf').get_attribute('href')=='/colombia_nuestra_casa_ru.pdf#page=25'
+            assert page.locator('#qa-pdf').inner_text()==ui('pdfRussian')+' · 2021'
+            assert page.locator('#qa-pdf').get_attribute('href')=='/colombia_nuestra_casa_ru.pdf#page=1'
             pdf_headers=[]
             for name in ('colombia_nuestra_casa.pdf','colombia_nuestra_casa_ru.pdf'):
                 response=context.request.head(f'http://127.0.0.1:{web.server_port}/{name}')
