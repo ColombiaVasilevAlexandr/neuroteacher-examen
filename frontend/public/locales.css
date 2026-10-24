@@ -4,3 +4,4 @@
 
 .sidebar select.language{display:block;width:100%;min-width:0;min-height:42px;text-align:start;color-scheme:dark}
 .sidebar select.language:focus-visible{outline:2px solid #ffd12a;outline-offset:3px}
+@media(max-width:550px){.sidebar{flex-wrap:wrap}.sidebar .sidebar-bottom{display:flex;flex-basis:100%;width:100%}.sidebar select.language{width:100%}}
