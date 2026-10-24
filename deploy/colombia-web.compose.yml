@@ -1,0 +1,29 @@
+services:
+  colombia:
+    image: ${COLOMBIA_IMAGE:?Set the approved existing lightweight runtime image}
+    pull_policy: never
+    entrypoint: ["python"]
+    command: ["-m", "uvicorn", "web_app:app", "--host", "127.0.0.1", "--port", "8024", "--workers", "1", "--limit-concurrency", "32", "--timeout-keep-alive", "5"]
+    user: "10001:10001"
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:size=32m,uid=10001,gid=10001"]
+    env_file: ["${COLOMBIA_ENV_FILE:-/etc/colombia-exam.env}"]
+    environment:
+      PYTHONPATH: /app/deps:/app/backend
+      COLOMBIA_STATE_DIR: /state
+      COLOMBIA_PUBLIC_ORIGIN: https://nt.es-pro.org
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - "${COLOMBIA_RELEASE_DIR:?Set the prepared release directory}:/app:ro"
+      - "/var/lib/colombia-exam:/state:rw"
+    logging:
+      driver: json-file
+      options: {max-size: "5m", max-file: "2"}
