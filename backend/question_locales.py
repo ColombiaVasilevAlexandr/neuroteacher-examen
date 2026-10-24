@@ -7,7 +7,7 @@ LOCALES = ['es', 'ru', 'en', 'de', 'fr', 'zh-Hans']
 LOCALE_LABELS = ['Español', 'Русский', 'English', 'Deutsch', 'Français', '简体中文']
 QUESTION_FIELDS = 'id,question_es,question_ru,answer_a,answer_a_ru,answer_b,answer_b_ru,answer_c,answer_c_ru,answer_d,answer_d_ru,explanation_es,explanation_ru,source_id,source_page,correct_answer'
 
-TRANSLATION_FILE = __import__('pathlib').Path(__file__).resolve().parents[1] / 'data/question-translations-en-zh.json'
+TRANSLATION_FILE = __import__('pathlib').Path(__file__).resolve().parents[1] / 'data/question-translations.json'
 
 def translation_source_hash(question):
     import hashlib
@@ -105,7 +105,7 @@ def localize_questions(db, rows, locale: Locale = 'es'):
         # Existing authored approval rules retain precedence; legacy study translations
         # are explicitly machine-translated and invalidated when their source changes.
         method = None
-        if question_id not in authored and locale in ('en', 'zh-Hans'):
+        if question_id not in authored and locale in ('en', 'zh-Hans', 'fr', 'de'):
             study = learning_translation(question, locale)
             if study:
                 prompt, options, explanation = study['question'], study['options'], study['explanation']

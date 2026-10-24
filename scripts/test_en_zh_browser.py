@@ -1,4 +1,4 @@
-"""Isolated browser acceptance for English/Chinese content; never writes the user DB."""
+"""Isolated browser acceptance for localized content; never writes the user DB."""
 import gc,functools,hashlib,http.server,json,socket,sqlite3,sys,tempfile,threading,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
@@ -36,7 +36,7 @@ def run():
     # Settings changed only in the temporary clone.
     with main.conn() as db:
      db.execute("INSERT OR REPLACE INTO study_settings(key,value) VALUES('exam_date','2026-12-01')")
-    for locale,voice in [('en','en-US'),('zh-Hans','zh-CN')]:
+    for locale,voice in [('en','en-US'),('zh-Hans','zh-CN'),('fr','fr-FR'),('de','de-DE')]:
      rows=context.request.get(f'http://127.0.0.1:{port}/api/questions?limit=1000&locale={locale}').json()
      assert len(rows)==646
      assert all(q['content_locale']==locale and q['translation_available'] for q in rows)
@@ -68,5 +68,5 @@ def run():
   main.DB_PATH=original
   gc.collect()
  assert hashlib.sha256(source.read_bytes()).hexdigest()==before
- print('PASS isolated English/Chinese question UI, real TTS playback, hidden answers and unchanged original database',flush=True)
+ print('PASS isolated four-language question UI, real TTS playback, hidden answers and unchanged original database',flush=True)
 if __name__=='__main__':run()

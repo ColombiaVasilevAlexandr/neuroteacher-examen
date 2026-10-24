@@ -1,8 +1,8 @@
-"""Build English/Chinese learning translations and complete audio lessons.
+"""Build localized learning translations and complete audio lessons.
 Uses the configured DeepSeek account. Keeps progress so reruns resume.
 Never modifies the exam database or marks translations human-approved.
 """
-import asyncio, concurrent.futures, hashlib, json, os, re, sqlite3, sys, threading, time
+import argparse, asyncio, concurrent.futures, hashlib, json, os, re, sqlite3, sys, threading, time
 from pathlib import Path
 from urllib import request, error
 from dotenv import load_dotenv
@@ -17,7 +17,11 @@ KEY=os.getenv('DEEPSEEK_API_KEY')
 if not KEY: raise SystemExit('Configured translation API key is missing')
 MODEL=os.getenv('DEEPSEEK_MODEL','deepseek-chat')
 LOCK=threading.Lock()
-LANGS={'en':('English','en-US-JennyNeural'),'zh-Hans':('Simplified Chinese','zh-CN-XiaoxiaoNeural')}
+LANGS={'en':('English','en-US-JennyNeural'),'zh-Hans':('Simplified Chinese','zh-CN-XiaoxiaoNeural'),'fr':('French','fr-FR-DeniseNeural'),'de':('German','de-DE-KatjaNeural')}
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--locales',nargs='+',choices=list(LANGS),default=['en','zh-Hans'])
+ARGS=parser.parse_args()
+SELECTED=ARGS.locales
 def atomic(path,data):
  path.parent.mkdir(parents=True,exist_ok=True)
  tmp=path.with_suffix(path.suffix+'.tmp')
@@ -115,23 +119,29 @@ def main():
  rows=[dict(q) for q in db.execute("SELECT id,question_es,answer_a,answer_b,answer_c,answer_d,explanation_es,correct_answer FROM questions ORDER BY id")];db.close()
  jobs=[]
  with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
-  for locale in LANGS:
+  for locale in SELECTED:
    for path in sorted((ROOT/'data/audio_scripts').glob('lesson-*.txt')):jobs.append(pool.submit(audio_job,locale,path))
-  for locale in LANGS:
+  for locale in SELECTED:
    for i,start in enumerate(range(0,len(rows),10)):jobs.append(pool.submit(questions_job,locale,i,rows[start:start+10]))
   results=[];failures=[]
   for job in concurrent.futures.as_completed(jobs):
    try:results.append(job.result())
    except Exception as exc:
     failures.append(str(exc));print('FAILED',type(exc).__name__,str(exc),flush=True)
- catalog={'version':1,'translation_method':'machine_translation_with_second_pass','independent_approval':False,'locales':{}}
- for locale in LANGS:
+ catalog_path=ROOT/'data/question-translations.json'
+ catalog=json.loads(catalog_path.read_text(encoding='utf-8')) if catalog_path.exists() else {'version':1,'translation_method':'machine_translation_with_second_pass','independent_approval':False,'locales':{}}
+ for locale in SELECTED:
   merged={}
   for path in sorted(OUT.glob(f'questions-{locale}-*.json')):merged.update(json.loads(path.read_text(encoding='utf-8')))
   if set(merged)!={str(q['id']) for q in rows}:failures.append('Incomplete '+locale)
   catalog['locales'][locale]=merged
  atomic(OUT/'generation-report.json',{'results':results,'failures':failures})
  if failures:raise SystemExit(f'{len(failures)} jobs failed; rerun resumes completed tasks')
- atomic(ROOT/'data/question-translations-en-zh.json',catalog)
- print('COMPLETE',len(rows),'questions per locale; 12 full audio lessons',flush=True)
+ # Spanish exercise alternatives must stay verbatim in every study locale.
+ for locale_items in catalog['locales'].values():
+  for question in rows:
+   if question['id'] in [18,19,352,359,367,371,373,375,377,689,691,696,698,699,700,704,705,706,716,717,718,752] and str(question['id']) in locale_items:
+    locale_items[str(question['id'])]['options']={key:question['answer_'+key.lower()] for key in 'ABCD'}
+ atomic(catalog_path,catalog)
+ print('COMPLETE',len(rows),'questions per locale;',len(SELECTED)*6,'full audio lessons; locales',','.join(SELECTED),flush=True)
 if __name__=='__main__':main()

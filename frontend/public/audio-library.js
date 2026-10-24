@@ -11,7 +11,7 @@
     { id: 'naturalization', number: '06', title: '\u041d\u0430\u0442\u0443\u0440\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f', topic: '\u041d\u0430\u0442\u0443\u0440\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f', file: 'lesson-06-naturalization-full.mp3' },
   ]
 
-  const audioLocale = () => ['en','zh-Hans'].includes(L.current) ? L.current : 'ru'
+  const audioLocale = () => ['en','zh-Hans','fr','de'].includes(L.current) ? L.current : 'ru'
   const stateKey = () => 'colombia-exam-audio-library' + (audioLocale() === 'ru' ? '' : ':' + audioLocale())
   const loadState = (key = stateKey()) => {
     try {
@@ -108,7 +108,7 @@
       <div class="audio-library-head">
         <div>
           <h2>${text.title}</h2>
-          <p>${text.intro}</p><p class="audio-translation-note" lang="en">${audioLocale() === 'en' ? 'Full English translation of the existing study lesson; automatically checked.' : audioLocale() === 'zh-Hans' ? '现有学习课程的完整中文译本，已自动核对。' : ''}</p>
+          <p>${text.intro}</p><p class="audio-translation-note" lang="en">${({en:'Full English translation of the existing study lesson; automatically checked.','zh-Hans':'现有学习课程的完整中文译本，已自动核对。',fr:'Traduction intégrale de la leçon existante, vérifiée automatiquement.',de:'Vollständige Übersetzung der vorhandenen Lektion, automatisch geprüft.'}[audioLocale()] || '')}</p>
         </div>
         <div class="audio-library-actions">
           <button class="continue">${text.continue}</button>
@@ -120,7 +120,7 @@
       <div class="audio-player">
         <strong>${current.number}. ${ui(current.id+'Title')}</strong>
         <div class="audio-current-meta">
-          <span>${L.escape(L.text(current.topic))}</span><span lang="en">${{ru:'Русский',en:'English','zh-Hans':'简体中文'}[audioLocale()]}</span>
+          <span>${L.escape(L.text(current.topic))}</span><span lang="en">${{ru:'Русский',en:'English','zh-Hans':'简体中文',fr:'Français',de:'Deutsch'}[audioLocale()]}</span>
           <span>${currentPosition ? ui('audioSaved',{time:formatTime(currentPosition)}) : text.fromStart}</span>
         </div>
         <audio controls preload="metadata" src="/audio/${audioLocale() === 'ru' ? '' : audioLocale() + '/'}${current.file}" data-current-id="${current.id}"></audio>

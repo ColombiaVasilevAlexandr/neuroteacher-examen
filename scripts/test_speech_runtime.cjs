@@ -57,6 +57,11 @@ function harness(fetch) {
   h.synthesis.speak({text:'欢迎来到哥伦比亚。',lang:'es-CO'})
   await new Promise(resolve => setTimeout(resolve, 30))
   assert.equal(calls[1].locale,'zh-CN')
+  for (const [lang,text] of [['fr-FR','Bienvenue en Colombie.'],['de-DE','Willkommen in Kolumbien.']]) {
+    h.synthesis.speak({text,lang})
+    await new Promise(resolve => setTimeout(resolve,30))
+    assert.equal(calls.at(-1).locale,lang)
+  }
   h = harness(async () => ({ok: false}))
   let errors = 0
   h.synthesis.speak({text: 'Hola', onerror: () => errors++})

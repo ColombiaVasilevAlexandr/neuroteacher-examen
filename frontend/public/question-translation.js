@@ -3,7 +3,7 @@
   let entries = new Map(), revision = 0, activeButton = null
   const normalize = value => String(value || '').replace(/^ES:\s*/, '').replace(/\s+/g, ' ').trim()
   const labels = {es:'Escuchar pregunta',ru:'Прослушать вопрос',en:'Listen to the question',de:'Frage anhören',fr:'Écouter la question','zh-Hans':'朗读题目'}
-  const notes = {en:'Machine translation checked against the original. Spanish exercise examples stay in Spanish.','zh-Hans':'本译文经自动核对。西班牙语练习中的例句保留原文。'}
+  const notes = {fr:'Traduction automatique comparée à l’original. Les exemples des exercices restent en espagnol.',de:'Maschinelle Übersetzung mit Abgleich am Original. Spanische Übungsbeispiele bleiben auf Spanisch.',en:'Machine translation checked against the original. Spanish exercise examples stay in Spanish.','zh-Hans':'本译文经自动核对。西班牙语练习中的例句保留原文。'}
   function apply() {
     if (activeButton && !activeButton.isConnected) { window.ColombiaSpeech?.stop(); activeButton = null }
     document.querySelectorAll('main.training .question-card, .study-session article').forEach(card => {
