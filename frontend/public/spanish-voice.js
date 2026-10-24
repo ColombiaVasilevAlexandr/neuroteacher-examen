@@ -9,7 +9,7 @@
   }
   const baseSpeak = synthesis.speak.bind(synthesis)
   synthesis.speak = utterance => {
-    if (utterance?.text && isSpanish(utterance.text)) {
+    if (utterance?.text && (!utterance.lang || /^es(?:-|$)/i.test(utterance.lang)) && isSpanish(utterance.text)) {
       utterance.lang = 'es-CO'
       const voice = selectVoice()
       if (voice) utterance.voice = voice

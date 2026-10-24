@@ -20,10 +20,14 @@
     nativeCancel()
     if (active) finish(active)
   }
+  const localeFor = locale => ({es:'es-CO',ru:'ru-RU',en:'en-US',de:'de-DE',fr:'fr-FR',zh:'zh-CN'}[String(locale || window.ColombiaLocales?.current || 'es').split('-')[0]] || 'es-CO')
+  const textLocale = (text, locale) => /[\u3400-\u9fff]/u.test(text) ? 'zh-CN'
+    : /[А-Яа-яЁё]/u.test(text) ? 'ru-RU'
+    : /^ru/i.test(locale || '') ? 'es-CO' : localeFor(locale)
   const segments = (text, locale) => clean(text).replace(/\b(ES|RU):/g, '\n')
     .split(/\n+/).flatMap(part => part.split(/(?<=[.!?])\s+(?=[A-ZА-ЯЁ¿¡])/u))
     .map(clean).filter(Boolean).map(text => ({
-      text, locale: /[А-Яа-яЁё]/.test(text) ? 'ru-RU' : /^ru/i.test(locale || '') ? 'es-CO' : locale || 'es-CO'
+      text, locale: textLocale(text, locale)
     }))
   const play = (blob, token) => new Promise((resolve, reject) => {
     if (token !== generation) { resolve(); return }
@@ -77,6 +81,7 @@
   }
   window.ColombiaSpeech = {
     stop: cancel,
+    localeFor,
     speak: (text, lang = 'es-CO', rate = 1) => new Promise((resolve, reject) => {
       synthesis.speak({text, lang, rate, onend: resolve, onerror: reject})
     })

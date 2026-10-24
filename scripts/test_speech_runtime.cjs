@@ -6,7 +6,7 @@ const source = fs.readFileSync(path.join(__dirname, '../frontend/public/neural-v
 const tick = () => new Promise(resolve => setTimeout(resolve, 5))
 function harness(fetch) {
   const state = {plays: 0, urls: 0, errors: 0}
-  const synthesis = {cancel() {}}
+  const synthesis = {cancel() {},getVoices() {return []}}
   const scope = {
     window: {speechSynthesis: synthesis, COLOMBIA_API_BASE: 'http://test/api', addEventListener() {}, dispatchEvent() {}},
     fetch, AbortController, Event,
@@ -18,6 +18,7 @@ function harness(fetch) {
     }
   }
   vm.runInNewContext(source, scope)
+  for (const name of ['speech-cleaner.js','spanish-voice.js']) vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../frontend/public',name),'utf8'), scope)
   return {state, synthesis}
 }
 ;(async () => {
@@ -48,6 +49,14 @@ function harness(fetch) {
   assert.equal(ended, 1)
   assert.equal(h.state.urls, 0, 'audio URLs must be released')
   assert.ok(calls.every(([url]) => url === 'http://test/api/consultant/speech'))
+  calls.length = 0
+  h = harness(async (url, options) => {calls.push(JSON.parse(options.body)); return {ok:true,blob:async()=>({})}})
+  h.synthesis.speak({text:'Welcome to Colombia.',lang:'en-US'})
+  await new Promise(resolve => setTimeout(resolve, 30))
+  assert.equal(calls[0].locale,'en-US')
+  h.synthesis.speak({text:'欢迎来到哥伦比亚。',lang:'es-CO'})
+  await new Promise(resolve => setTimeout(resolve, 30))
+  assert.equal(calls[1].locale,'zh-CN')
   h = harness(async () => ({ok: false}))
   let errors = 0
   h.synthesis.speak({text: 'Hola', onerror: () => errors++})

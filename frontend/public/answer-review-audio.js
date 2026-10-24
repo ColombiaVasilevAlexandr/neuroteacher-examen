@@ -15,7 +15,7 @@
         playing = true
         button.textContent = '■ Остановить'
         try {
-          await window.ColombiaSpeech.speak(`${correct.innerText}\n\n${explanation.innerText}`, 'es-CO')
+          await window.ColombiaSpeech.speak(`${correct.querySelector("[data-content]")?.innerText || correct.innerText}\n\n${explanation.innerText}`, window.ColombiaSpeech.localeFor(feedback.lang || window.ColombiaLocales.current))
           button.textContent = '🔊 Прослушать ещё раз'
         } catch {
           button.textContent = 'Не удалось озвучить — попробуйте ещё раз'
